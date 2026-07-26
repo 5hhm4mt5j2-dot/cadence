@@ -36,7 +36,7 @@ function Loading() {
 
 export default function Shell({ v }) {
   return (
-    <div data-theme={v.theme} style={s("min-height:100%; background:#D8DBE2; display:flex; justify-content:center; align-items:flex-start; padding:32px 16px; font-family:'Plus Jakarta Sans',system-ui,sans-serif;")}>
+    <div data-theme={v.theme} style={s("min-height:100dvh; background:var(--bg); display:flex; justify-content:center; align-items:flex-start; padding:calc(env(safe-area-inset-top) + 32px) calc(env(safe-area-inset-right) + 16px) calc(env(safe-area-inset-bottom) + 32px) calc(env(safe-area-inset-left) + 16px); font-family:'Plus Jakarta Sans',system-ui,sans-serif;")}>
       <div data-lt-phone style={s('position:relative; width:390px; max-width:100%; height:844px; display:flex; flex-direction:column; background:var(--bg); border-radius:36px; overflow:hidden; box-shadow:0 24px 60px rgba(16,24,40,.22);')}>
 
         <div style={s('height:52px; flex:none;')}></div>

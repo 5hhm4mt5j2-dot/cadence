@@ -1,7 +1,13 @@
 /* Cadence — global styles ported from the Claude Design export <helmet> block */
 
 * { box-sizing: border-box; }
-body { margin: 0; }
+html, body { height: 100%; margin: 0; }
+
+/* Fill the iOS safe-area strips (status bar / home indicator) and the
+   overscroll rubber-band with the app's theme background instead of the
+   device default. Tracks the system scheme, matching the theme-color metas. */
+html { background: #F4F1EC; }
+@media (prefers-color-scheme: dark) { html { background: #211F1C; } }
 
 :root {
   --bg: #F4F1EC; --surface: #FBF9F5; --surface-2: #EFEBE3;
