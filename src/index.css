@@ -76,19 +76,24 @@ html { background: #F4F1EC; }
 /* Bottom sheets sit above the iOS home indicator (env resolves to 0 elsewhere). */
 [data-lt-sheet] { padding-bottom: calc(env(safe-area-inset-bottom) + 24px) !important; }
 
-/* Native feel: no grey tap flash, no long-press copy callout, and no text
-   selection on UI chrome. Form fields keep selection and editing. */
-.app-canvas {
+/* Native feel: kill long-press text selection, the iOS copy/share callout, and
+   the grey tap flash across ALL UI chrome (buttons, headers, nav, cards, rows).
+   Applied with the universal selector so long-press gestures — e.g. holding the
+   greeting to open the profile menu — never start a native selection instead.
+   Genuine text fields explicitly opt back in below. */
+* {
   -webkit-tap-highlight-color: transparent;
   -webkit-touch-callout: none;
   -webkit-user-select: none;
   user-select: none;
 }
-.app-canvas input,
-.app-canvas textarea {
-  -webkit-user-select: auto;
-  user-select: auto;
+input,
+textarea,
+select,
+[contenteditable="true"] {
   -webkit-touch-callout: default;
+  -webkit-user-select: text;
+  user-select: text;
 }
 
 @media print {
