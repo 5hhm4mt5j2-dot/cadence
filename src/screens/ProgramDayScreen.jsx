@@ -22,7 +22,7 @@ export default function ProgramDayScreen({ v }) {
               <button onClick={v.exitReorder} style={s('border:none; cursor:pointer; background:var(--accent); color:#fff; font-family:inherit; font-size:12.5px; font-weight:800; padding:7px 18px; border-radius:999px;')}>Done</button>
             )}
             {pdx.notReorderMode && (
-              <button onClick={v.addProgramExercise} aria-label="Add exercise" style={s('width:30px; height:30px; display:inline-flex; align-items:center; justify-content:center; border:none; cursor:pointer; background:var(--accent); color:#fff; border-radius:50%; padding:0; font-size:20px; line-height:1;')}>+</button>
+              <button onClick={v.addProgramExercise} aria-label="Add exercise" style={s('width:44px; height:44px; display:inline-flex; align-items:center; justify-content:center; border:none; cursor:pointer; background:var(--accent); color:#fff; border-radius:50%; padding:0; font-size:20px; line-height:1;')}>+</button>
             )}
           </div>
           {pdx.hasExercises && (

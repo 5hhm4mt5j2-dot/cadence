@@ -23,7 +23,7 @@ export function DatabaseDetailScreen({ v }) {
     <div style={s('padding:14px 16px 28px;')}>
       <div style={s('display:flex; align-items:center; justify-content:space-between; margin:4px 4px 10px;')}>
         <span style={s('font-size:13px; font-weight:800; color:var(--text);')}>Exercises</span>
-        <button onClick={v.addDbExercise} aria-label="Add exercise" style={s('width:30px; height:30px; display:inline-flex; align-items:center; justify-content:center; border:none; cursor:pointer; background:var(--accent); color:#fff; border-radius:50%; padding:0; font-size:20px; line-height:1;')}>+</button>
+        <button onClick={v.addDbExercise} aria-label="Add exercise" style={s('width:44px; height:44px; display:inline-flex; align-items:center; justify-content:center; border:none; cursor:pointer; background:var(--accent); color:#fff; border-radius:50%; padding:0; font-size:20px; line-height:1;')}>+</button>
       </div>
       {dbx.hasExercises && (
         <div style={s('display:flex; flex-direction:column; gap:10px;')}>

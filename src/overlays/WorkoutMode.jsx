@@ -10,7 +10,7 @@ export default function WorkoutMode({ v }) {
         <div style={s('min-width:0; display:flex; align-items:center; height:36px;')}>
           <div style={s('font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.07em;')}>Workout · {wo.dayLabel}</div>
         </div>
-        <button onClick={wo.exit} aria-label="Exit workout" style={s('width:36px; height:36px; flex:none; border-radius:50%; border:1px solid var(--border); background:var(--surface); cursor:pointer; color:var(--muted); font-size:14px; line-height:1; font-weight:700; font-family:inherit;')}>✕</button>
+        <button onClick={wo.exit} aria-label="Exit workout" style={s('width:44px; height:44px; flex:none; border-radius:50%; border:1px solid var(--border); background:var(--surface); cursor:pointer; color:var(--muted); font-size:14px; line-height:1; font-weight:700; font-family:inherit;')}>✕</button>
       </div>
 
       {/* set logger */}

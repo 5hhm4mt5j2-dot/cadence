@@ -83,7 +83,7 @@ export function DbFormSheet({ v }) {
             {dbf.equipment.map((eq, i) => (
               <div key={i} style={s('display:flex; align-items:center; gap:8px;')}>
                 <input value={eq.value} onChange={eq.onInput} placeholder="e.g. Barbell, flat bench" style={s('flex:1; border:1px solid var(--border); border-radius:11px; padding:11px 13px; background:var(--surface-2); font-family:inherit; font-size:13px; font-weight:600; color:var(--text); outline:none;')} />
-                <button onClick={eq.remove} aria-label="Remove option" style={s(`width:34px; height:34px; flex:none; border:1px solid var(--border); background:transparent; border-radius:10px; cursor:pointer; color:#EF4444; font-size:17px; line-height:1; align-items:center; justify-content:center; display:${eq.removeDisplay};`)}>×</button>
+                <button onClick={eq.remove} aria-label="Remove option" style={s(`width:44px; height:44px; flex:none; border:1px solid var(--border); background:transparent; border-radius:10px; cursor:pointer; color:#EF4444; font-size:17px; line-height:1; align-items:center; justify-content:center; display:${eq.removeDisplay};`)}>×</button>
               </div>
             ))}
           </div>

@@ -39,7 +39,7 @@ export default function SessionScreen({ v }) {
           {/* exercises */}
           <div style={s('display:flex; align-items:center; justify-content:space-between; margin:20px 4px 10px;')}>
             <span style={s('font-size:13px; font-weight:800; color:var(--text);')}>{sx.listLabel}</span>
-            <button onClick={v.addExercise} aria-label="Add activity" style={s('width:30px; height:30px; display:inline-flex; align-items:center; justify-content:center; border:none; cursor:pointer; background:var(--accent); color:#fff; border-radius:50%; padding:0; font-size:20px; line-height:1;')}>+</button>
+            <button onClick={v.addExercise} aria-label="Add activity" style={s('width:44px; height:44px; display:inline-flex; align-items:center; justify-content:center; border:none; cursor:pointer; background:var(--accent); color:#fff; border-radius:50%; padding:0; font-size:20px; line-height:1;')}>+</button>
           </div>
 
           {sx.hasExercises && (

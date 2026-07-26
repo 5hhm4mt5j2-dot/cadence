@@ -116,7 +116,7 @@ export default function MealsScreen({ v }) {
                     </div>
                     <div style={s("font-family:'JetBrains Mono',monospace; font-size:11.5px; color:var(--muted); font-weight:600; margin-top:4px;")}>{c.macros}</div>
                   </div>
-                  <button onClick={c.quickAdd} title="Add to today" style={s('width:36px; height:36px; flex:none; border:none; cursor:pointer; background:var(--accent); color:#fff; border-radius:999px; font-size:19px; line-height:1; display:inline-flex; align-items:center; justify-content:center; font-weight:600;')}>+</button>
+                  <button onClick={c.quickAdd} title="Add to today" style={s('width:44px; height:44px; flex:none; border:none; cursor:pointer; background:var(--accent); color:#fff; border-radius:999px; font-size:19px; line-height:1; display:inline-flex; align-items:center; justify-content:center; font-weight:600;')}>+</button>
                 </div>
               ))}
             </div>
