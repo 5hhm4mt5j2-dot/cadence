@@ -1,111 +1,53 @@
+/* Cadence — global styles ported from the Claude Design export <helmet> block */
+
+* { box-sizing: border-box; }
+body { margin: 0; }
+
 :root {
-  --text: #6b6375;
-  --text-h: #08060d;
-  --bg: #fff;
-  --border: #e5e4e7;
-  --code-bg: #f4f3ec;
-  --accent: #aa3bff;
-  --accent-bg: rgba(170, 59, 255, 0.1);
-  --accent-border: rgba(170, 59, 255, 0.5);
-  --social-bg: rgba(244, 243, 236, 0.5);
-  --shadow:
-    rgba(0, 0, 0, 0.1) 0 10px 15px -3px, rgba(0, 0, 0, 0.05) 0 4px 6px -2px;
-
-  --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --heading: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --mono: ui-monospace, Consolas, monospace;
-
-  font: 18px/145% var(--sans);
-  letter-spacing: 0.18px;
-  color-scheme: light dark;
-  color: var(--text);
-  background: var(--bg);
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-
-  @media (max-width: 1024px) {
-    font-size: 16px;
-  }
+  --bg: #F4F1EC; --surface: #FBF9F5; --surface-2: #EFEBE3;
+  --text: #2C2926; --muted: #8A8276; --faint: #B7AEA0; --border: #E6E0D6; --track: #E6E0D6;
+  --primary: #6E8B7E; --accent: #6E8B7E; --accent-soft: rgba(110,139,126,.16);
+  --color-scrollbar: #C9C1B4;
+  --shadow: 0 1px 2px rgba(60,41,26,.04), 0 10px 30px rgba(60,41,26,.06);
+}
+[data-theme="dark"] {
+  --bg: #211F1C; --surface: #2A2825; --surface-2: #34322E;
+  --text: #F0EBE2; --muted: #A8A095; --faint: #7C7468; --border: #3A3733; --track: #3A3733;
+  --primary: #8FAE9F; --accent: #8FAE9F; --accent-soft: rgba(143,174,159,.18);
+  --color-scrollbar: #4A463F;
+  --shadow: 0 1px 2px rgba(0,0,0,.3), 0 10px 30px rgba(0,0,0,.34);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --text: #9ca3af;
-    --text-h: #f3f4f6;
-    --bg: #16171d;
-    --border: #2e303a;
-    --code-bg: #1f2028;
-    --accent: #c084fc;
-    --accent-bg: rgba(192, 132, 252, 0.15);
-    --accent-border: rgba(192, 132, 252, 0.5);
-    --social-bg: rgba(47, 48, 58, 0.5);
-    --shadow:
-      rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
-  }
+@keyframes grow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+@keyframes appfade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes slideUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes shimmer { 0% { background-position: -200px 0; } 100% { background-position: 200px 0; } }
+.sk { background: linear-gradient(90deg, var(--surface-2) 25%, var(--border) 37%, var(--surface-2) 63%); background-size: 400px 100%; animation: shimmer 1.3s infinite linear; border-radius: 12px; }
+.scrollable { scrollbar-width: thin; scrollbar-color: transparent transparent; transition: scrollbar-color 200ms ease-out; }
+.scrollable.lt-scrolling { scrollbar-color: var(--color-scrollbar) transparent; }
+.scrollable::-webkit-scrollbar { width: 8px; height: 8px; }
+.scrollable::-webkit-scrollbar-track { background: transparent; }
+.scrollable::-webkit-scrollbar-thumb { background: transparent; border-radius: 4px; transition: background 200ms ease-out; }
+.scrollable.lt-scrolling::-webkit-scrollbar-thumb { background: var(--color-scrollbar); }
+@keyframes sunSpin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+@keyframes sunPulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.08); } }
+@keyframes wkSlideL { from { transform: translateX(26px); opacity: .35; } to { transform: translateX(0); opacity: 1; } }
+@keyframes wkSlideR { from { transform: translateX(-26px); opacity: .35; } to { transform: translateX(0); opacity: 1; } }
+@keyframes cloudDrift1 { 0%, 100% { transform: translateX(-6px); } 50% { transform: translateX(6px); } }
+@keyframes cloudDrift2 { 0%, 100% { transform: translateX(4px); } 50% { transform: translateX(-4px); } }
+@keyframes rainFall { 0% { transform: translateY(-4px); opacity: 0; } 30% { opacity: 1; } 100% { transform: translateY(22px); opacity: 0; } }
+@keyframes snowFall { 0% { transform: translate(0,-4px); opacity: 0; } 20% { opacity: 1; } 100% { transform: translate(4px,24px); opacity: 0; } }
+@keyframes moonGlow { 0%, 100% { box-shadow: 0 0 14px rgba(200,210,255,.5); } 50% { box-shadow: 0 0 22px rgba(200,210,255,.8); } }
+@keyframes starTwinkle { 0%, 100% { opacity: .25; } 50% { opacity: 1; } }
+@keyframes jiggle { 0% { transform: rotate(-0.7deg); } 50% { transform: rotate(0.7deg); } 100% { transform: rotate(-0.7deg); } }
+@keyframes zenIn { from { opacity: 0; transform: scale(.96) translateY(10px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+@keyframes tutGlow { 0%, 100% { box-shadow: 0 0 0 9999px rgba(20,16,12,.8), 0 0 0 2px var(--accent), 0 0 22px 4px rgba(110,139,126,.5); } 50% { box-shadow: 0 0 0 9999px rgba(20,16,12,.8), 0 0 0 2px var(--accent), 0 0 30px 8px rgba(110,139,126,.75); } }
+@keyframes wLine { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes wRing { from { opacity: 0; transform: scale(.4); } to { opacity: 1; transform: scale(1); } }
+@keyframes toastIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
 
-  #social .button-icon {
-    filter: invert(1) brightness(2);
-  }
-}
-
-body {
-  margin: 0;
-}
-
-#root {
-  width: 1126px;
-  max-width: 100%;
-  margin: 0 auto;
-  text-align: center;
-  border-inline: 1px solid var(--border);
-  min-height: 100svh;
-  display: flex;
-  flex-direction: column;
-  box-sizing: border-box;
-}
-
-h1,
-h2 {
-  font-family: var(--heading);
-  font-weight: 500;
-  color: var(--text-h);
-}
-
-h1 {
-  font-size: 56px;
-  letter-spacing: -1.68px;
-  margin: 32px 0;
-  @media (max-width: 1024px) {
-    font-size: 36px;
-    margin: 20px 0;
-  }
-}
-h2 {
-  font-size: 24px;
-  line-height: 118%;
-  letter-spacing: -0.24px;
-  margin: 0 0 8px;
-  @media (max-width: 1024px) {
-    font-size: 20px;
-  }
-}
-p {
-  margin: 0;
-}
-
-code,
-.counter {
-  font-family: var(--mono);
-  display: inline-flex;
-  border-radius: 4px;
-  color: var(--text-h);
-}
-
-code {
-  font-size: 15px;
-  line-height: 135%;
-  padding: 4px 8px;
-  background: var(--code-bg);
+@media print {
+  body * { visibility: hidden; }
+  #lt-print-area, #lt-print-area * { visibility: visible; }
+  #lt-print-area { position: static !important; width: auto !important; height: auto !important; overflow: visible !important; left: auto !important; }
 }
