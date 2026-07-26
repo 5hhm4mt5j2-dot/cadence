@@ -29,7 +29,7 @@ html { background: #F4F1EC; }
 @keyframes slideUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes shimmer { 0% { background-position: -200px 0; } 100% { background-position: 200px 0; } }
 .sk { background: linear-gradient(90deg, var(--surface-2) 25%, var(--border) 37%, var(--surface-2) 63%); background-size: 400px 100%; animation: shimmer 1.3s infinite linear; border-radius: 12px; }
-.scrollable { scrollbar-width: thin; scrollbar-color: transparent transparent; transition: scrollbar-color 200ms ease-out; }
+.scrollable { scrollbar-width: thin; scrollbar-color: transparent transparent; transition: scrollbar-color 200ms ease-out; overscroll-behavior: contain; }
 .scrollable.lt-scrolling { scrollbar-color: var(--color-scrollbar) transparent; }
 .scrollable::-webkit-scrollbar { width: 8px; height: 8px; }
 .scrollable::-webkit-scrollbar-track { background: transparent; }
@@ -59,6 +59,10 @@ html { background: #F4F1EC; }
    [data-lt-scroll] scrolls — overlays never move with the content behind them).
    Desktop keeps the centered phone mockup. */
 @media (max-width: 480px) {
+  /* Lock the document so only [data-lt-scroll] / sheet scrollers move — kills
+     the whole-page rubber-band in standalone. (Desktop keeps body scroll for
+     the taller phone mockup.) */
+  html, body { overflow: hidden; }
   .app-canvas { padding: 0 !important; }
   [data-lt-phone] {
     width: 100% !important;
@@ -71,6 +75,21 @@ html { background: #F4F1EC; }
 
 /* Bottom sheets sit above the iOS home indicator (env resolves to 0 elsewhere). */
 [data-lt-sheet] { padding-bottom: calc(env(safe-area-inset-bottom) + 24px) !important; }
+
+/* Native feel: no grey tap flash, no long-press copy callout, and no text
+   selection on UI chrome. Form fields keep selection and editing. */
+.app-canvas {
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+.app-canvas input,
+.app-canvas textarea {
+  -webkit-user-select: auto;
+  user-select: auto;
+  -webkit-touch-callout: default;
+}
 
 @media print {
   body * { visibility: hidden; }
