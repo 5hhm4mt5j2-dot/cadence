@@ -12,20 +12,20 @@ export default function MealsScreen({ v }) {
           <div style={s('font-size:12.5px; color:var(--muted); font-weight:500; line-height:1.5; margin:2px 4px 14px;')}>A few details to set your daily calorie and macro targets.</div>
           <div style={s('background:var(--surface); border:1px solid var(--border); border-radius:20px; padding:18px 16px; box-shadow:var(--shadow);')}>
             <div style={s('font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin-bottom:6px;')}>Name</div>
-            <input value={pf.name} onChange={pf.onName} placeholder="Your name" style={s('width:100%; border:1px solid var(--border); border-radius:11px; padding:11px 13px; background:var(--surface-2); font-family:inherit; font-size:14px; font-weight:700; color:var(--text); outline:none;')} />
+            <input value={pf.name} onChange={pf.onName} placeholder="Your name" style={s('width:100%; border:1px solid var(--border); border-radius:11px; padding:11px 13px; background:var(--surface-2); font-family:inherit; font-size:16px; font-weight:700; color:var(--text); outline:none;')} />
             <div style={s('font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin:16px 0 6px;')}>Body</div>
             <div style={s('display:flex; gap:9px;')}>
               <div style={s('flex:1;')}>
                 <div style={s('font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin-bottom:6px;')}>Height cm</div>
-                <input type="number" value={pf.height} onChange={pf.onHeight} style={s("width:100%; border:1px solid var(--border); border-radius:11px; padding:11px 10px; background:var(--surface-2); font-family:'JetBrains Mono',monospace; font-size:14px; font-weight:700; color:var(--text); outline:none; text-align:center;")} />
+                <input type="number" value={pf.height} onChange={pf.onHeight} style={s("width:100%; border:1px solid var(--border); border-radius:11px; padding:11px 10px; background:var(--surface-2); font-family:'JetBrains Mono',monospace; font-size:16px; font-weight:700; color:var(--text); outline:none; text-align:center;")} />
               </div>
               <div style={s('flex:1;')}>
                 <div style={s('font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin-bottom:6px;')}>Weight kg</div>
-                <input type="number" value={pf.weight} onChange={pf.onWeight} style={s("width:100%; border:1px solid var(--border); border-radius:11px; padding:11px 10px; background:var(--surface-2); font-family:'JetBrains Mono',monospace; font-size:14px; font-weight:700; color:var(--text); outline:none; text-align:center;")} />
+                <input type="number" value={pf.weight} onChange={pf.onWeight} style={s("width:100%; border:1px solid var(--border); border-radius:11px; padding:11px 10px; background:var(--surface-2); font-family:'JetBrains Mono',monospace; font-size:16px; font-weight:700; color:var(--text); outline:none; text-align:center;")} />
               </div>
               <div style={s('flex:.8;')}>
                 <div style={s('font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin-bottom:6px;')}>Age</div>
-                <input type="number" value={pf.age} onChange={pf.onAge} style={s("width:100%; border:1px solid var(--border); border-radius:11px; padding:11px 10px; background:var(--surface-2); font-family:'JetBrains Mono',monospace; font-size:14px; font-weight:700; color:var(--text); outline:none; text-align:center;")} />
+                <input type="number" value={pf.age} onChange={pf.onAge} style={s("width:100%; border:1px solid var(--border); border-radius:11px; padding:11px 10px; background:var(--surface-2); font-family:'JetBrains Mono',monospace; font-size:16px; font-weight:700; color:var(--text); outline:none; text-align:center;")} />
               </div>
             </div>
             <div style={s('font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin:16px 0 6px;')}>Sex</div>

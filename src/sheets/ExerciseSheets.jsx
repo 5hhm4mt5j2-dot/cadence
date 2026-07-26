@@ -11,22 +11,22 @@ export function ExerciseSheet({ v }) {
         <div style={s('font-size:17px; font-weight:800; color:var(--text); letter-spacing:-.02em;')}>{ef.heading}</div>
         <div style={s('margin-top:16px;')}>
           <div style={s('font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin-bottom:6px;')}>{ef.nameLabel}</div>
-          <input value={ef.name} onChange={ef.onName} placeholder="e.g. Bench Press" style={s('width:100%; border:1px solid var(--border); border-radius:11px; padding:11px 13px; background:var(--surface-2); font-family:inherit; font-size:14px; font-weight:700; color:var(--text); outline:none;')} />
+          <input value={ef.name} onChange={ef.onName} placeholder="e.g. Bench Press" style={s('width:100%; border:1px solid var(--border); border-radius:11px; padding:11px 13px; background:var(--surface-2); font-family:inherit; font-size:16px; font-weight:700; color:var(--text); outline:none;')} />
         </div>
         {ef.isStrength && (
           <>
             <div style={s('display:flex; gap:9px; margin-top:12px;')}>
               <div style={s('flex:1;')}>
                 <div style={s('font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin-bottom:6px;')}>Sets</div>
-                <input type="number" value={ef.sets} onChange={ef.onSets} style={s("width:100%; border:1px solid var(--border); border-radius:11px; padding:11px 10px; background:var(--surface-2); font-family:'JetBrains Mono',monospace; font-size:14px; font-weight:700; color:var(--text); outline:none; text-align:center;")} />
+                <input type="number" value={ef.sets} onChange={ef.onSets} style={s("width:100%; border:1px solid var(--border); border-radius:11px; padding:11px 10px; background:var(--surface-2); font-family:'JetBrains Mono',monospace; font-size:16px; font-weight:700; color:var(--text); outline:none; text-align:center;")} />
               </div>
               <div style={s('flex:1;')}>
                 <div style={s('font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin-bottom:6px;')}>Reps</div>
-                <input type="number" value={ef.reps} onChange={ef.onReps} style={s("width:100%; border:1px solid var(--border); border-radius:11px; padding:11px 10px; background:var(--surface-2); font-family:'JetBrains Mono',monospace; font-size:14px; font-weight:700; color:var(--text); outline:none; text-align:center;")} />
+                <input type="number" value={ef.reps} onChange={ef.onReps} style={s("width:100%; border:1px solid var(--border); border-radius:11px; padding:11px 10px; background:var(--surface-2); font-family:'JetBrains Mono',monospace; font-size:16px; font-weight:700; color:var(--text); outline:none; text-align:center;")} />
               </div>
               <div style={s('flex:1.2;')}>
                 <div style={s('font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin-bottom:6px;')}>Weight (kg)</div>
-                <input type="number" value={ef.weight} onChange={ef.onWeight} style={s("width:100%; border:1px solid var(--border); border-radius:11px; padding:11px 10px; background:var(--surface-2); font-family:'JetBrains Mono',monospace; font-size:14px; font-weight:700; color:var(--text); outline:none; text-align:center;")} />
+                <input type="number" value={ef.weight} onChange={ef.onWeight} style={s("width:100%; border:1px solid var(--border); border-radius:11px; padding:11px 10px; background:var(--surface-2); font-family:'JetBrains Mono',monospace; font-size:16px; font-weight:700; color:var(--text); outline:none; text-align:center;")} />
               </div>
             </div>
             <div style={s('display:flex; align-items:center; justify-content:space-between; margin-top:14px; background:var(--surface-2); border-radius:12px; padding:12px 14px;')}>
@@ -39,7 +39,7 @@ export function ExerciseSheet({ v }) {
           <>
             <div style={s('margin-top:12px;')}>
               <div style={s('font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin-bottom:6px;')}>Duration (min)</div>
-              <input type="number" value={ef.duration} onChange={ef.onDuration} style={s("width:100%; border:1px solid var(--border); border-radius:11px; padding:11px 10px; background:var(--surface-2); font-family:'JetBrains Mono',monospace; font-size:14px; font-weight:700; color:var(--text); outline:none; text-align:center;")} />
+              <input type="number" value={ef.duration} onChange={ef.onDuration} style={s("width:100%; border:1px solid var(--border); border-radius:11px; padding:11px 10px; background:var(--surface-2); font-family:'JetBrains Mono',monospace; font-size:16px; font-weight:700; color:var(--text); outline:none; text-align:center;")} />
             </div>
             <div style={s('margin-top:14px;')}>
               <div style={s('font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin-bottom:8px;')}>Intensity</div>
@@ -71,18 +71,18 @@ export function DbFormSheet({ v }) {
         <div style={s('font-size:17px; font-weight:800; color:var(--text); letter-spacing:-.02em;')}>{dbf.heading}</div>
         <div style={s('margin-top:16px;')}>
           <div style={s('font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin-bottom:6px;')}>Exercise</div>
-          <input value={dbf.name} onChange={dbf.onName} placeholder="e.g. Bench Press" style={s('width:100%; border:1px solid var(--border); border-radius:11px; padding:11px 13px; background:var(--surface-2); font-family:inherit; font-size:14px; font-weight:700; color:var(--text); outline:none;')} />
+          <input value={dbf.name} onChange={dbf.onName} placeholder="e.g. Bench Press" style={s('width:100%; border:1px solid var(--border); border-radius:11px; padding:11px 13px; background:var(--surface-2); font-family:inherit; font-size:16px; font-weight:700; color:var(--text); outline:none;')} />
         </div>
         <div style={s('margin-top:12px;')}>
           <div style={s('font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin-bottom:6px;')}>Description</div>
-          <textarea value={dbf.description} onChange={dbf.onDescription} placeholder="Cues, setup, form notes…" style={s('width:100%; min-height:90px; resize:none; border:1px solid var(--border); border-radius:14px; padding:12px 14px; background:var(--surface-2); font-family:inherit; font-size:13px; font-weight:500; color:var(--text); outline:none;')}></textarea>
+          <textarea value={dbf.description} onChange={dbf.onDescription} placeholder="Cues, setup, form notes…" style={s('width:100%; min-height:90px; resize:none; border:1px solid var(--border); border-radius:14px; padding:12px 14px; background:var(--surface-2); font-family:inherit; font-size:16px; font-weight:500; color:var(--text); outline:none;')}></textarea>
         </div>
         <div style={s('margin-top:12px;')}>
           <div style={s('font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin-bottom:6px;')}>Equipment</div>
           <div style={s('display:flex; flex-direction:column; gap:8px;')}>
             {dbf.equipment.map((eq, i) => (
               <div key={i} style={s('display:flex; align-items:center; gap:8px;')}>
-                <input value={eq.value} onChange={eq.onInput} placeholder="e.g. Barbell, flat bench" style={s('flex:1; border:1px solid var(--border); border-radius:11px; padding:11px 13px; background:var(--surface-2); font-family:inherit; font-size:13px; font-weight:600; color:var(--text); outline:none;')} />
+                <input value={eq.value} onChange={eq.onInput} placeholder="e.g. Barbell, flat bench" style={s('flex:1; border:1px solid var(--border); border-radius:11px; padding:11px 13px; background:var(--surface-2); font-family:inherit; font-size:16px; font-weight:600; color:var(--text); outline:none;')} />
                 <button onClick={eq.remove} aria-label="Remove option" style={s(`width:44px; height:44px; flex:none; border:1px solid var(--border); background:transparent; border-radius:10px; cursor:pointer; color:#EF4444; font-size:17px; line-height:1; align-items:center; justify-content:center; display:${eq.removeDisplay};`)}>×</button>
               </div>
             ))}
@@ -120,11 +120,11 @@ export function ProgramAddSheet({ v }) {
         <div style={s('display:flex; gap:9px; margin-top:18px;')}>
           <div style={s('flex:1;')}>
             <div style={s('font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin-bottom:6px;')}>Sets</div>
-            <input type="number" value={paf.sets} onChange={paf.onSets} style={s("width:100%; border:1px solid var(--border); border-radius:11px; padding:11px 10px; background:var(--surface-2); font-family:'JetBrains Mono',monospace; font-size:14px; font-weight:700; color:var(--text); outline:none; text-align:center;")} />
+            <input type="number" value={paf.sets} onChange={paf.onSets} style={s("width:100%; border:1px solid var(--border); border-radius:11px; padding:11px 10px; background:var(--surface-2); font-family:'JetBrains Mono',monospace; font-size:16px; font-weight:700; color:var(--text); outline:none; text-align:center;")} />
           </div>
           <div style={s('flex:1;')}>
             <div style={s('font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin-bottom:6px;')}>Reps</div>
-            <input type="number" value={paf.reps} onChange={paf.onReps} style={s("width:100%; border:1px solid var(--border); border-radius:11px; padding:11px 10px; background:var(--surface-2); font-family:'JetBrains Mono',monospace; font-size:14px; font-weight:700; color:var(--text); outline:none; text-align:center;")} />
+            <input type="number" value={paf.reps} onChange={paf.onReps} style={s("width:100%; border:1px solid var(--border); border-radius:11px; padding:11px 10px; background:var(--surface-2); font-family:'JetBrains Mono',monospace; font-size:16px; font-weight:700; color:var(--text); outline:none; text-align:center;")} />
           </div>
         </div>
         <div style={s('margin-top:18px;')}>
@@ -156,7 +156,7 @@ export function CardioAddSheet({ v }) {
         <div style={s('display:flex; gap:9px; margin-top:18px; align-items:flex-end;')}>
           <div style={s('flex:1;')}>
             <div style={s('font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin-bottom:6px;')}>Duration (min)</div>
-            <input type="number" value={caf.duration} onChange={caf.onDuration} style={s("width:100%; border:1px solid var(--border); border-radius:11px; padding:11px 10px; background:var(--surface-2); font-family:'JetBrains Mono',monospace; font-size:14px; font-weight:700; color:var(--text); outline:none; text-align:center;")} />
+            <input type="number" value={caf.duration} onChange={caf.onDuration} style={s("width:100%; border:1px solid var(--border); border-radius:11px; padding:11px 10px; background:var(--surface-2); font-family:'JetBrains Mono',monospace; font-size:16px; font-weight:700; color:var(--text); outline:none; text-align:center;")} />
           </div>
         </div>
         <div style={s('margin-top:16px;')}>

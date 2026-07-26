@@ -10,7 +10,7 @@ export function MealAddSheet({ v }) {
         <div style={s('width:40px; height:4px; border-radius:999px; background:var(--border); margin:0 auto 16px;')}></div>
         <div style={s('font-size:17px; font-weight:800; color:var(--text); letter-spacing:-.02em;')}>{ma.title}</div>
         {ma.onCustom && (
-          <input value={ma.mealName} onChange={ma.onMealName} placeholder="Meal name e.g. Oat Breakfast" style={s('width:100%; margin-top:12px; border:1px solid var(--border); border-radius:11px; padding:11px 12px; background:var(--surface-2); font-family:inherit; font-size:13.5px; font-weight:700; color:var(--text); outline:none;')} />
+          <input value={ma.mealName} onChange={ma.onMealName} placeholder="Meal name e.g. Oat Breakfast" style={s('width:100%; margin-top:12px; border:1px solid var(--border); border-radius:11px; padding:11px 12px; background:var(--surface-2); font-family:inherit; font-size:16px; font-weight:700; color:var(--text); outline:none;')} />
         )}
         <div style={s('display:flex; gap:4px; margin-top:14px; background:var(--surface-2); border-radius:12px; padding:4px;')}>
           <button onClick={ma.tabText} style={s(`flex:1; border:none; cursor:pointer; font-family:inherit; font-size:12px; font-weight:700; padding:9px 0; border-radius:9px; background:${ma.textTabBg}; color:${ma.textTabFg};`)}>Text</button>
@@ -21,12 +21,12 @@ export function MealAddSheet({ v }) {
           <>
             <div style={s('margin-top:16px;')}>
               <div style={s('font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin-bottom:6px;')}>Describe your meal</div>
-              <textarea value={ma.text} onChange={ma.onTextInput} placeholder="e.g. chicken breast 200g, brown rice 150g, olive oil 1 tbsp" style={s('width:100%; min-height:64px; resize:none; border:1px solid var(--border); border-radius:14px; padding:12px 14px; background:var(--surface-2); font-family:inherit; font-size:13px; font-weight:500; color:var(--text); outline:none;')}></textarea>
+              <textarea value={ma.text} onChange={ma.onTextInput} placeholder="e.g. chicken breast 200g, brown rice 150g, olive oil 1 tbsp" style={s('width:100%; min-height:64px; resize:none; border:1px solid var(--border); border-radius:14px; padding:12px 14px; background:var(--surface-2); font-family:inherit; font-size:16px; font-weight:500; color:var(--text); outline:none;')}></textarea>
               <button onClick={ma.estimate} style={s('width:100%; margin-top:8px; border:1px solid var(--accent); background:transparent; cursor:pointer; font-family:inherit; font-size:12.5px; font-weight:700; color:var(--accent); padding:10px 0; border-radius:11px;')}>{ma.estimateLabel}</button>
             </div>
             <div style={s('margin-top:16px;')}>
               <div style={s('font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin-bottom:6px;')}>Or search USDA foods</div>
-              <input value={ma.search} onChange={ma.onSearch} placeholder="Search generic names e.g. chicken breast" style={s('width:100%; border:1px solid var(--border); border-radius:11px; padding:11px 13px; background:var(--surface-2); font-family:inherit; font-size:13.5px; font-weight:600; color:var(--text); outline:none;')} />
+              <input value={ma.search} onChange={ma.onSearch} placeholder="Search generic names e.g. chicken breast" style={s('width:100%; border:1px solid var(--border); border-radius:11px; padding:11px 13px; background:var(--surface-2); font-family:inherit; font-size:16px; font-weight:600; color:var(--text); outline:none;')} />
               {ma.searching && (
                 <div style={s('margin-top:8px; font-size:11.5px; color:var(--muted); font-weight:600;')}>Searching USDA FoodData Central…</div>
               )}
@@ -72,7 +72,7 @@ export function MealAddSheet({ v }) {
               <div style={s('flex:1; height:1px; background:var(--border);')}></div>
             </div>
             <div style={s('display:flex; gap:8px;')}>
-              <input value={ma.scan.manual} onChange={ma.scan.onManual} inputMode="numeric" placeholder="Barcode number" style={s("flex:1; min-width:0; border:1px solid var(--border); border-radius:11px; padding:11px 13px; background:var(--surface-2); font-family:'JetBrains Mono',monospace; font-size:13px; font-weight:700; color:var(--text); outline:none;")} />
+              <input value={ma.scan.manual} onChange={ma.scan.onManual} inputMode="numeric" placeholder="Barcode number" style={s("flex:1; min-width:0; border:1px solid var(--border); border-radius:11px; padding:11px 13px; background:var(--surface-2); font-family:'JetBrains Mono',monospace; font-size:16px; font-weight:700; color:var(--text); outline:none;")} />
               <button onClick={ma.scan.submitManual} style={s('flex:none; border:1px solid var(--accent); background:transparent; cursor:pointer; font-family:inherit; font-size:12.5px; font-weight:700; color:var(--accent); padding:0 16px; border-radius:11px;')}>Look up</button>
             </div>
             {ma.scan.hasCamErr && (
@@ -96,7 +96,7 @@ export function MealAddSheet({ v }) {
                     <div style={s('font-size:13px; font-weight:700; color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;')}>{it.food}</div>
                     <div style={s("font-family:'JetBrains Mono',monospace; font-size:10.5px; color:var(--muted); font-weight:600; margin-top:2px;")}>{it.macros}</div>
                   </div>
-                  <input type="number" value={it.qty} onChange={it.onQty} style={s("width:60px; flex:none; border:1px solid var(--border); border-radius:9px; padding:8px 4px; background:var(--surface-2); font-family:'JetBrains Mono',monospace; font-size:12.5px; font-weight:700; color:var(--text); outline:none; text-align:center;")} />
+                  <input type="number" value={it.qty} onChange={it.onQty} style={s("width:60px; flex:none; border:1px solid var(--border); border-radius:9px; padding:8px 4px; background:var(--surface-2); font-family:'JetBrains Mono',monospace; font-size:16px; font-weight:700; color:var(--text); outline:none; text-align:center;")} />
                   <button onClick={it.toggleUnit} style={s('flex:none; border:1px solid var(--border); background:var(--surface-2); border-radius:9px; cursor:pointer; font-family:inherit; font-size:11px; font-weight:700; color:var(--muted); padding:8px 9px; min-width:34px;')}>{it.unit}</button>
                   <button onClick={it.remove} style={s('width:44px; height:44px; flex:none; border:1px solid var(--border); background:transparent; border-radius:9px; cursor:pointer; color:#EF4444; font-size:16px; line-height:1; display:inline-flex; align-items:center; justify-content:center;')}>×</button>
                 </div>
@@ -167,7 +167,7 @@ export function MealAddSheet({ v }) {
                 <span style={s('font-size:12.5px; font-weight:700; color:rgba(255,255,255,.7);')}>Servings</span>
                 <div style={s('display:flex; align-items:center; gap:10px;')}>
                   <button onClick={ma.scan.decServ} style={s('width:44px; height:44px; border:none; border-radius:10px; background:rgba(255,255,255,.14); color:#fff; font-size:20px; cursor:pointer; line-height:1;')}>−</button>
-                  <input type="number" value={ma.scan.servings} onChange={ma.scan.onServ} style={s("width:58px; border:none; border-radius:10px; padding:9px 4px; background:rgba(255,255,255,.14); color:#fff; font-family:'JetBrains Mono',monospace; font-size:14px; font-weight:800; text-align:center; outline:none;")} />
+                  <input type="number" value={ma.scan.servings} onChange={ma.scan.onServ} style={s("width:58px; border:none; border-radius:10px; padding:9px 4px; background:rgba(255,255,255,.14); color:#fff; font-family:'JetBrains Mono',monospace; font-size:16px; font-weight:800; text-align:center; outline:none;")} />
                   <button onClick={ma.scan.incServ} style={s('width:44px; height:44px; border:none; border-radius:10px; background:rgba(255,255,255,.14); color:#fff; font-size:20px; cursor:pointer; line-height:1;')}>+</button>
                 </div>
               </div>
@@ -218,7 +218,7 @@ export function MealDetailSheet({ v }) {
                 <div style={s('font-size:13px; font-weight:700; color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;')}>{it.food}</div>
                 <div style={s("font-family:'JetBrains Mono',monospace; font-size:10.5px; color:var(--muted); font-weight:600; margin-top:2px;")}>{it.macros}</div>
               </div>
-              <input type="number" value={it.qty} onChange={it.onQty} style={s("width:60px; flex:none; border:1px solid var(--border); border-radius:9px; padding:8px 4px; background:var(--surface-2); font-family:'JetBrains Mono',monospace; font-size:12.5px; font-weight:700; color:var(--text); outline:none; text-align:center;")} />
+              <input type="number" value={it.qty} onChange={it.onQty} style={s("width:60px; flex:none; border:1px solid var(--border); border-radius:9px; padding:8px 4px; background:var(--surface-2); font-family:'JetBrains Mono',monospace; font-size:16px; font-weight:700; color:var(--text); outline:none; text-align:center;")} />
               <button onClick={it.toggleUnit} style={s('flex:none; border:1px solid var(--border); background:var(--surface-2); border-radius:9px; cursor:pointer; font-family:inherit; font-size:11px; font-weight:700; color:var(--muted); padding:8px 9px; min-width:34px;')}>{it.unit}</button>
               <button onClick={it.remove} style={s('width:44px; height:44px; flex:none; border:1px solid var(--border); background:transparent; border-radius:9px; cursor:pointer; color:#EF4444; font-size:16px; line-height:1; display:inline-flex; align-items:center; justify-content:center;')}>×</button>
             </div>
@@ -253,7 +253,7 @@ export function SavedMealDetailSheet({ v }) {
                 <div style={s('font-size:13px; font-weight:700; color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;')}>{it.food}</div>
                 <div style={s("font-family:'JetBrains Mono',monospace; font-size:10.5px; color:var(--muted); font-weight:600; margin-top:2px;")}>{it.macros}</div>
               </div>
-              <input type="number" value={it.qty} onChange={it.onQty} style={s("width:60px; flex:none; border:1px solid var(--border); border-radius:9px; padding:8px 4px; background:var(--surface-2); font-family:'JetBrains Mono',monospace; font-size:12.5px; font-weight:700; color:var(--text); outline:none; text-align:center;")} />
+              <input type="number" value={it.qty} onChange={it.onQty} style={s("width:60px; flex:none; border:1px solid var(--border); border-radius:9px; padding:8px 4px; background:var(--surface-2); font-family:'JetBrains Mono',monospace; font-size:16px; font-weight:700; color:var(--text); outline:none; text-align:center;")} />
               <button onClick={it.toggleUnit} style={s('flex:none; border:1px solid var(--border); background:var(--surface-2); border-radius:9px; cursor:pointer; font-family:inherit; font-size:11px; font-weight:700; color:var(--muted); padding:8px 9px; min-width:34px;')}>{it.unit}</button>
               <button onClick={it.remove} style={s('width:44px; height:44px; flex:none; border:1px solid var(--border); background:transparent; border-radius:9px; cursor:pointer; color:#EF4444; font-size:16px; line-height:1; display:inline-flex; align-items:center; justify-content:center;')}>×</button>
             </div>
@@ -288,11 +288,11 @@ export function NutritionExportSheet({ v }) {
         <div style={s('display:flex; gap:9px; margin-top:16px;')}>
           <div style={s('flex:1;')}>
             <div style={s('font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin-bottom:6px;')}>From</div>
-            <input type="date" value={exd.from} onChange={exd.onFrom} style={s("width:100%; border:1px solid var(--border); border-radius:11px; padding:10px 10px; background:var(--surface-2); font-family:'JetBrains Mono',monospace; font-size:12.5px; font-weight:700; color:var(--text); outline:none;")} />
+            <input type="date" value={exd.from} onChange={exd.onFrom} style={s("width:100%; border:1px solid var(--border); border-radius:11px; padding:10px 10px; background:var(--surface-2); font-family:'JetBrains Mono',monospace; font-size:16px; font-weight:700; color:var(--text); outline:none;")} />
           </div>
           <div style={s('flex:1;')}>
             <div style={s('font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin-bottom:6px;')}>To</div>
-            <input type="date" value={exd.to} onChange={exd.onTo} style={s("width:100%; border:1px solid var(--border); border-radius:11px; padding:10px 10px; background:var(--surface-2); font-family:'JetBrains Mono',monospace; font-size:12.5px; font-weight:700; color:var(--text); outline:none;")} />
+            <input type="date" value={exd.to} onChange={exd.onTo} style={s("width:100%; border:1px solid var(--border); border-radius:11px; padding:10px 10px; background:var(--surface-2); font-family:'JetBrains Mono',monospace; font-size:16px; font-weight:700; color:var(--text); outline:none;")} />
           </div>
         </div>
         <button onClick={exd.run} style={s('width:100%; margin-top:20px; border:none; cursor:pointer; background:var(--text); color:var(--surface); font-family:inherit; font-size:14px; font-weight:800; padding:14px 0; border-radius:13px;')}>Export PDF</button>

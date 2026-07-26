@@ -69,11 +69,11 @@ export default function QuickAdd({ v }) {
               <div style={s('display:flex; gap:9px; margin-top:18px;')}>
                 <div style={s('flex:1;')}>
                   <div style={s('font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin-bottom:6px;')}>Sets</div>
-                  <input type="number" value={qa.sets} onChange={qa.onSets} style={s("width:100%; border:1px solid var(--border); border-radius:11px; padding:11px 10px; background:var(--surface-2); font-family:'JetBrains Mono',monospace; font-size:14px; font-weight:700; color:var(--text); outline:none; text-align:center;")} />
+                  <input type="number" value={qa.sets} onChange={qa.onSets} style={s("width:100%; border:1px solid var(--border); border-radius:11px; padding:11px 10px; background:var(--surface-2); font-family:'JetBrains Mono',monospace; font-size:16px; font-weight:700; color:var(--text); outline:none; text-align:center;")} />
                 </div>
                 <div style={s('flex:1;')}>
                   <div style={s('font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin-bottom:6px;')}>Reps</div>
-                  <input type="number" value={qa.reps} onChange={qa.onReps} style={s("width:100%; border:1px solid var(--border); border-radius:11px; padding:11px 10px; background:var(--surface-2); font-family:'JetBrains Mono',monospace; font-size:14px; font-weight:700; color:var(--text); outline:none; text-align:center;")} />
+                  <input type="number" value={qa.reps} onChange={qa.onReps} style={s("width:100%; border:1px solid var(--border); border-radius:11px; padding:11px 10px; background:var(--surface-2); font-family:'JetBrains Mono',monospace; font-size:16px; font-weight:700; color:var(--text); outline:none; text-align:center;")} />
                 </div>
               </div>
             )}
@@ -81,7 +81,7 @@ export default function QuickAdd({ v }) {
               <>
                 <div style={s('margin-top:18px;')}>
                   <div style={s('font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin-bottom:6px;')}>Duration (min)</div>
-                  <input type="number" value={qa.duration} onChange={qa.onDuration} style={s("width:100%; border:1px solid var(--border); border-radius:11px; padding:11px 10px; background:var(--surface-2); font-family:'JetBrains Mono',monospace; font-size:14px; font-weight:700; color:var(--text); outline:none; text-align:center;")} />
+                  <input type="number" value={qa.duration} onChange={qa.onDuration} style={s("width:100%; border:1px solid var(--border); border-radius:11px; padding:11px 10px; background:var(--surface-2); font-family:'JetBrains Mono',monospace; font-size:16px; font-weight:700; color:var(--text); outline:none; text-align:center;")} />
                 </div>
                 <div style={s('margin-top:16px;')}>
                   <div style={s('font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin-bottom:8px;')}>Intensity</div>

@@ -45,7 +45,7 @@ export function TagRename({ v }) {
         <div style={s('width:40px; height:4px; border-radius:999px; background:var(--border); margin:0 auto 16px;')}></div>
         <div style={s('font-size:17px; font-weight:800; color:var(--text); letter-spacing:-.02em;')}>Name this day</div>
         <div style={s('font-size:12.5px; color:var(--muted); font-weight:500; margin-top:4px;')}>Give {tr.dayFull}'s custom session its own tag — e.g. "Arms Day" or "Full Body".</div>
-        <input value={tr.value} onChange={tr.onChange} placeholder="Custom" style={s('width:100%; margin-top:14px; border:1px solid var(--border); border-radius:11px; padding:11px 13px; background:var(--surface-2); font-family:inherit; font-size:14px; font-weight:700; color:var(--text); outline:none;')} />
+        <input value={tr.value} onChange={tr.onChange} placeholder="Custom" style={s('width:100%; margin-top:14px; border:1px solid var(--border); border-radius:11px; padding:11px 13px; background:var(--surface-2); font-family:inherit; font-size:16px; font-weight:700; color:var(--text); outline:none;')} />
         <div style={s('display:flex; gap:9px; margin-top:16px;')}>
           <button onClick={tr.reset} style={s('flex:1; border:1px solid var(--border); cursor:pointer; background:var(--surface); color:var(--muted); font-family:inherit; font-size:13px; font-weight:700; padding:12px 0; border-radius:12px;')}>Reset to Custom</button>
           <button onClick={tr.save} style={s('flex:1.4; border:none; cursor:pointer; background:var(--text); color:var(--surface); font-family:inherit; font-size:13.5px; font-weight:800; padding:12px 0; border-radius:12px;')}>Save name</button>
@@ -94,19 +94,19 @@ export function ProfileEditSheet({ v }) {
         <div style={s('width:40px; height:4px; border-radius:999px; background:var(--border); margin:0 auto 16px;')}></div>
         <div style={s('font-size:17px; font-weight:800; color:var(--text); letter-spacing:-.02em;')}>Edit profile</div>
         <div style={s('font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin:16px 0 6px;')}>Name</div>
-        <input value={pf.name} onChange={pf.onName} placeholder="Your name" style={s('width:100%; border:1px solid var(--border); border-radius:11px; padding:11px 13px; background:var(--surface-2); font-family:inherit; font-size:14px; font-weight:700; color:var(--text); outline:none;')} />
+        <input value={pf.name} onChange={pf.onName} placeholder="Your name" style={s('width:100%; border:1px solid var(--border); border-radius:11px; padding:11px 13px; background:var(--surface-2); font-family:inherit; font-size:16px; font-weight:700; color:var(--text); outline:none;')} />
         <div style={s('display:flex; gap:9px; margin-top:14px;')}>
           <div style={s('flex:1;')}>
             <div style={s('font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin-bottom:6px;')}>Height cm</div>
-            <input type="number" value={pf.height} onChange={pf.onHeight} style={s("width:100%; border:1px solid var(--border); border-radius:11px; padding:11px 10px; background:var(--surface-2); font-family:'JetBrains Mono',monospace; font-size:14px; font-weight:700; color:var(--text); outline:none; text-align:center;")} />
+            <input type="number" value={pf.height} onChange={pf.onHeight} style={s("width:100%; border:1px solid var(--border); border-radius:11px; padding:11px 10px; background:var(--surface-2); font-family:'JetBrains Mono',monospace; font-size:16px; font-weight:700; color:var(--text); outline:none; text-align:center;")} />
           </div>
           <div style={s('flex:1;')}>
             <div style={s('font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin-bottom:6px;')}>Weight kg</div>
-            <input type="number" value={pf.weight} onChange={pf.onWeight} style={s("width:100%; border:1px solid var(--border); border-radius:11px; padding:11px 10px; background:var(--surface-2); font-family:'JetBrains Mono',monospace; font-size:14px; font-weight:700; color:var(--text); outline:none; text-align:center;")} />
+            <input type="number" value={pf.weight} onChange={pf.onWeight} style={s("width:100%; border:1px solid var(--border); border-radius:11px; padding:11px 10px; background:var(--surface-2); font-family:'JetBrains Mono',monospace; font-size:16px; font-weight:700; color:var(--text); outline:none; text-align:center;")} />
           </div>
           <div style={s('flex:.8;')}>
             <div style={s('font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin-bottom:6px;')}>Age</div>
-            <input type="number" value={pf.age} onChange={pf.onAge} style={s("width:100%; border:1px solid var(--border); border-radius:11px; padding:11px 10px; background:var(--surface-2); font-family:'JetBrains Mono',monospace; font-size:14px; font-weight:700; color:var(--text); outline:none; text-align:center;")} />
+            <input type="number" value={pf.age} onChange={pf.onAge} style={s("width:100%; border:1px solid var(--border); border-radius:11px; padding:11px 10px; background:var(--surface-2); font-family:'JetBrains Mono',monospace; font-size:16px; font-weight:700; color:var(--text); outline:none; text-align:center;")} />
           </div>
         </div>
         <div style={s('font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin:16px 0 6px;')}>Sex</div>
@@ -168,7 +168,7 @@ export function SupplementsEdit({ v }) {
           ))}
         </div>
         <div style={s('display:flex; gap:9px; margin-top:14px;')}>
-          <input value={v.newSupplementName} onChange={v.onNewSupplementInput} placeholder="e.g. Vitamin D" style={s('flex:1; border:1px solid var(--border); border-radius:11px; padding:11px 13px; background:var(--surface-2); font-family:inherit; font-size:14px; font-weight:700; color:var(--text); outline:none;')} />
+          <input value={v.newSupplementName} onChange={v.onNewSupplementInput} placeholder="e.g. Vitamin D" style={s('flex:1; border:1px solid var(--border); border-radius:11px; padding:11px 13px; background:var(--surface-2); font-family:inherit; font-size:16px; font-weight:700; color:var(--text); outline:none;')} />
           <button onClick={v.addSupplement} style={s('border:none; cursor:pointer; background:var(--accent); color:#fff; font-family:inherit; font-size:14px; font-weight:700; padding:0 18px; border-radius:11px;')}>Add</button>
         </div>
         <button onClick={v.closeSupplementsEdit} style={s('width:100%; margin-top:20px; border:none; cursor:pointer; background:var(--text); color:var(--surface); font-family:inherit; font-size:14px; font-weight:700; padding:13px 0; border-radius:13px;')}>Done</button>

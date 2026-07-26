@@ -169,7 +169,7 @@ export default function Hero({ v }) {
           <div style={s('display:flex; flex-direction:column; gap:5px; align-items:flex-end;')}>
             <div style={s('font-size:9.5px; font-weight:600; color:var(--faint); line-height:1.3; max-width:150px; text-align:right;')}>{weather.wxErrorMsg}</div>
             <div style={s('display:flex; gap:5px;')}>
-              <input value={weather.cityInput} onChange={weather.onCityInput} placeholder="City" style={s('width:88px; border:1px solid var(--border); border-radius:9px; padding:6px 9px; background:var(--surface-2); font-family:inherit; font-size:12px; font-weight:600; color:var(--text); outline:none;')} />
+              <input value={weather.cityInput} onChange={weather.onCityInput} placeholder="City" style={s('width:88px; border:1px solid var(--border); border-radius:9px; padding:6px 9px; background:var(--surface-2); font-family:inherit; font-size:16px; font-weight:600; color:var(--text); outline:none;')} />
               <button onClick={weather.submitCity} style={s('border:none; cursor:pointer; background:var(--text); color:var(--surface); font-family:inherit; font-size:11.5px; font-weight:700; padding:0 12px; border-radius:9px;')}>Set</button>
             </div>
           </div>

@@ -81,7 +81,7 @@ export default function SessionScreen({ v }) {
 
           {/* notes */}
           <div style={s('font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin:18px 4px 8px;')}>Notes</div>
-          <textarea value={sx.notes} onChange={v.onNotes} placeholder="How did the session feel?" style={s('width:100%; min-height:64px; resize:none; border:1px solid var(--border); border-radius:14px; padding:12px 14px; background:var(--surface); font-family:inherit; font-size:13px; font-weight:500; color:var(--text); outline:none;')}></textarea>
+          <textarea value={sx.notes} onChange={v.onNotes} placeholder="How did the session feel?" style={s('width:100%; min-height:64px; resize:none; border:1px solid var(--border); border-radius:14px; padding:12px 14px; background:var(--surface); font-family:inherit; font-size:16px; font-weight:500; color:var(--text); outline:none;')}></textarea>
 
           {/* start workout */}
           {sx.showStart && (

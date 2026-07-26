@@ -19,7 +19,7 @@ export function WorkoutSettingsSheet({ v }) {
         </div>
         <div style={s('display:flex; align-items:center; gap:9px; margin-top:10px;')}>
           <span style={s('font-size:12px; font-weight:600; color:var(--muted);')}>Custom</span>
-          <input value={wsx.restCustom} onChange={wsx.onRestCustom} inputMode="numeric" style={s("width:76px; border:1px solid var(--border); border-radius:11px; padding:9px 11px; background:var(--bg); font-family:'JetBrains Mono',monospace; font-size:13px; font-weight:600; color:var(--text); outline:none; text-align:center;")} />
+          <input value={wsx.restCustom} onChange={wsx.onRestCustom} inputMode="numeric" style={s("width:76px; border:1px solid var(--border); border-radius:11px; padding:9px 11px; background:var(--bg); font-family:'JetBrains Mono',monospace; font-size:16px; font-weight:600; color:var(--text); outline:none; text-align:center;")} />
           <span style={s('font-size:12px; font-weight:600; color:var(--muted);')}>seconds</span>
         </div>
 
@@ -92,7 +92,7 @@ export function RpeSheet({ v }) {
                   <div style={s('font-size:13px; font-weight:700; color:var(--text);')}>{c.name}</div>
                   <div style={s('display:flex; align-items:center; gap:10px; margin-top:10px;')}>
                     <span style={s('font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.05em;')}>Min</span>
-                    <input type="number" value={c.duration} onChange={c.onDuration} style={s("width:70px; border:1px solid var(--border); border-radius:10px; padding:8px 10px; background:var(--surface); font-family:'JetBrains Mono',monospace; font-size:13px; font-weight:700; color:var(--text); outline:none; text-align:center;")} />
+                    <input type="number" value={c.duration} onChange={c.onDuration} style={s("width:70px; border:1px solid var(--border); border-radius:10px; padding:8px 10px; background:var(--surface); font-family:'JetBrains Mono',monospace; font-size:16px; font-weight:700; color:var(--text); outline:none; text-align:center;")} />
                   </div>
                   <div style={s('display:flex; gap:7px; margin-top:10px;')}>
                     {c.intensities.map((it, j) => (
@@ -105,7 +105,7 @@ export function RpeSheet({ v }) {
           </>
         )}
         <div style={s('font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin:18px 4px 8px;')}>Notes (optional)</div>
-        <textarea value={rpe.notes} onChange={rpe.onNotes} placeholder="Felt strong · slept poorly · weak today…" style={s('width:100%; min-height:56px; resize:none; border:1px solid var(--border); border-radius:14px; padding:12px 14px; background:var(--surface); font-family:inherit; font-size:13px; font-weight:500; color:var(--text); outline:none;')}></textarea>
+        <textarea value={rpe.notes} onChange={rpe.onNotes} placeholder="Felt strong · slept poorly · weak today…" style={s('width:100%; min-height:56px; resize:none; border:1px solid var(--border); border-radius:14px; padding:12px 14px; background:var(--surface); font-family:inherit; font-size:16px; font-weight:500; color:var(--text); outline:none;')}></textarea>
         <button onClick={rpe.submit} disabled={rpe.submitDisabled} style={s(`width:100%; margin-top:16px; border:none; cursor:pointer; background:var(--text); color:var(--surface); font-family:inherit; font-size:14.5px; font-weight:800; padding:15px 0; border-radius:14px; opacity:${rpe.submitOpacity};`)}>Log RPE</button>
       </div>
     </>
