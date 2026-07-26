@@ -23,14 +23,14 @@ export function ImportLoading() {
       <div className="sk" style={s('height:92px; border-radius:20px;')}></div>
       <div className="sk" style={s('height:148px; border-radius:20px;')}></div>
       <div className="sk" style={s('height:180px; border-radius:20px;')}></div>
-      <div style={s('position:absolute; left:0; right:0; bottom:34px; text-align:center; font-size:12.5px; font-weight:700; color:var(--muted);')}>Restoring your data…</div>
+      <div style={s('position:absolute; left:0; right:0; bottom:calc(env(safe-area-inset-bottom) + 34px); text-align:center; font-size:12.5px; font-weight:700; color:var(--muted);')}>Restoring your data…</div>
     </div>
   );
 }
 
 export function Toast({ v }) {
   return (
-    <div style={s('position:absolute; left:16px; right:16px; bottom:26px; z-index:95; pointer-events:none; display:flex; justify-content:center;')}>
+    <div style={s('position:absolute; left:16px; right:16px; bottom:calc(env(safe-area-inset-bottom) + 26px); z-index:95; pointer-events:none; display:flex; justify-content:center;')}>
       <div style={s('background:var(--text); color:var(--surface); font-size:12.5px; font-weight:600; line-height:1.4; padding:12px 16px; border-radius:13px; box-shadow:0 10px 30px rgba(0,0,0,.3); max-width:100%; text-align:center; text-wrap:pretty; animation:toastIn .25s ease both;')}>{v.toast}</div>
     </div>
   );
@@ -137,7 +137,7 @@ export function SideMenu({ v }) {
   return (
     <>
       <div data-lt-backdrop onClick={v.closeMenu} style={s('position:absolute; inset:0; background:rgba(0,0,0,.42); z-index:44;')}></div>
-      <div className="scrollable" style={s('position:absolute; top:0; bottom:0; left:0; z-index:45; width:270px; max-width:80%; background:var(--surface); box-shadow:8px 0 30px rgba(0,0,0,.2); padding:20px 16px; display:flex; flex-direction:column; overflow-y:auto; animation:slideUp .2s ease-out;')}>
+      <div className="scrollable" style={s('position:absolute; top:0; bottom:0; left:0; z-index:45; width:270px; max-width:80%; background:var(--surface); box-shadow:8px 0 30px rgba(0,0,0,.2); padding:calc(env(safe-area-inset-top) + 20px) 16px calc(env(safe-area-inset-bottom) + 20px) calc(env(safe-area-inset-left) + 16px); display:flex; flex-direction:column; overflow-y:auto; animation:slideUp .2s ease-out;')}>
         <div style={s('font-size:19px; font-weight:800; color:var(--text); letter-spacing:-.02em; margin:6px 4px 18px;')}>Menu</div>
         {v.menuItems.map((mi, i) => (
           <div key={i} onClick={mi.select} style={s(`display:flex; align-items:center; gap:12px; padding:13px 10px; border-radius:13px; cursor:pointer; background:${mi.bg};`)}>

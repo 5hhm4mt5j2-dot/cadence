@@ -136,7 +136,7 @@ export function RecoveryPrompt({ v }) {
 export function RecoveryView({ v }) {
   const rv = v.recoveryViewData;
   return (
-    <div className="scrollable" style={s('position:absolute; inset:0; z-index:86; background:var(--bg); display:flex; flex-direction:column; overflow-y:auto;')}>
+    <div className="scrollable" style={s('position:absolute; inset:0; z-index:86; background:var(--bg); display:flex; flex-direction:column; overflow-y:auto; padding-top:env(safe-area-inset-top); padding-bottom:env(safe-area-inset-bottom);')}>
       <div style={s('flex:none; display:flex; align-items:center; gap:12px; padding:18px 20px 10px;')}>
         <button onClick={rv.close} style={s('width:34px; height:34px; flex:none; border:1px solid var(--border); background:var(--surface); border-radius:11px; cursor:pointer; display:flex; align-items:center; justify-content:center; color:var(--text); padding:0;')}>
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6"></path></svg>

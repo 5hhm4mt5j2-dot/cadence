@@ -4,8 +4,8 @@ import { s } from '../lib/helpers';
 export default function WorkoutMode({ v }) {
   const wo = v.wo;
   return (
-    <div onTouchStart={wo.activity} onMouseDown={wo.activity} style={s(`position:absolute; inset:0; z-index:70; background:var(--bg); display:flex; flex-direction:column; transition:filter .5s ease; filter:${wo.dim};`)}>
-      <div style={s('height:52px; flex:none;')}></div>
+    <div onTouchStart={wo.activity} onMouseDown={wo.activity} style={s(`position:absolute; inset:0; z-index:70; background:var(--bg); display:flex; flex-direction:column; padding-bottom:env(safe-area-inset-bottom); transition:filter .5s ease; filter:${wo.dim};`)}>
+      <div style={s('height:max(52px, env(safe-area-inset-top)); flex:none;')}></div>
       <div style={s('flex:none; display:flex; align-items:flex-start; justify-content:space-between; gap:10px; padding:6px 20px 0;')}>
         <div style={s('min-width:0; display:flex; align-items:center; height:36px;')}>
           <div style={s('font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.07em;')}>Workout · {wo.dayLabel}</div>

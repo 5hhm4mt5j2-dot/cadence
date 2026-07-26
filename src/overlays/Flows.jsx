@@ -57,7 +57,7 @@ export function Tutorial({ v }) {
       {tut.noSpot && (
         <div style={s('position:absolute; inset:0; background:rgba(20,16,12,.8);')}></div>
       )}
-      <button onClick={tut.skip} style={s('position:absolute; top:16px; left:16px; z-index:2; pointer-events:auto; border:none; background:rgba(0,0,0,.28); backdrop-filter:blur(4px); cursor:pointer; font-family:inherit; font-size:12px; font-weight:700; color:#fff; padding:7px 14px; border-radius:999px;')}>Skip Tutorial</button>
+      <button onClick={tut.skip} style={s('position:absolute; top:calc(env(safe-area-inset-top) + 16px); left:calc(env(safe-area-inset-left) + 16px); z-index:2; pointer-events:auto; border:none; background:rgba(0,0,0,.28); backdrop-filter:blur(4px); cursor:pointer; font-family:inherit; font-size:12px; font-weight:700; color:#fff; padding:7px 14px; border-radius:999px;')}>Skip Tutorial</button>
       <div style={s(`position:absolute; left:16px; right:16px; top:${tut.cardTop}; bottom:${tut.cardBottom}; pointer-events:auto;`)}>
         <div style={s('background:var(--surface); border:1px solid var(--border); border-radius:20px; padding:20px; box-shadow:0 16px 44px rgba(0,0,0,.34); animation:zenIn .4s cubic-bezier(.22,1,.36,1) both;')}>
           <div style={s('display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;')}>
@@ -101,7 +101,7 @@ export function Onboarding({ v }) {
   const onb = v.onb;
   return (
     <div className="scrollable" style={s('position:absolute; inset:0; z-index:70; background:var(--bg); display:flex; flex-direction:column; padding:0 24px; overflow-y:auto;')}>
-      <div style={s('flex:none; padding-top:64px;')}>
+      <div style={s('flex:none; padding-top:calc(env(safe-area-inset-top) + 64px);')}>
         <div style={s('display:flex; gap:6px; margin-bottom:34px;')}>
           {onb.dots.map((d, i) => (
             <div key={i} style={s(`flex:1; height:4px; border-radius:2px; background:${d.bg}; transition:background .3s ease;`)}></div>
@@ -162,7 +162,7 @@ export function Onboarding({ v }) {
           <div style={s('margin-top:14px; font-size:12px; font-weight:600; color:#EF4444; line-height:1.5;')}>{onb.err}</div>
         )}
       </div>
-      <div style={s('flex:none; display:flex; gap:10px; padding-bottom:34px;')}>
+      <div style={s('flex:none; display:flex; gap:10px; padding-bottom:calc(env(safe-area-inset-bottom) + 34px);')}>
         {onb.canBack && (
           <button onClick={onb.back} style={s('flex:none; width:56px; border:1px solid var(--border); cursor:pointer; background:var(--surface); color:var(--muted); font-family:inherit; font-size:20px; font-weight:700; border-radius:14px;')}>‹</button>
         )}

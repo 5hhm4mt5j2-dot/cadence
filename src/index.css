@@ -52,6 +52,26 @@ html { background: #F4F1EC; }
 @keyframes wRing { from { opacity: 0; transform: scale(.4); } to { opacity: 1; transform: scale(1); } }
 @keyframes toastIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
 
+/* On phone-sized screens (installed standalone app or mobile browser) let the
+   phone frame fill the whole screen. Every overlay/sheet is absolutely
+   positioned inside [data-lt-phone], so once the frame is the screen they all
+   reach the true edges and are pinned (the frame's overflow:hidden means only
+   [data-lt-scroll] scrolls — overlays never move with the content behind them).
+   Desktop keeps the centered phone mockup. */
+@media (max-width: 480px) {
+  .app-canvas { padding: 0 !important; }
+  [data-lt-phone] {
+    width: 100% !important;
+    max-width: none !important;
+    height: 100dvh !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+  }
+}
+
+/* Bottom sheets sit above the iOS home indicator (env resolves to 0 elsewhere). */
+[data-lt-sheet] { padding-bottom: calc(env(safe-area-inset-bottom) + 24px) !important; }
+
 @media print {
   body * { visibility: hidden; }
   #lt-print-area, #lt-print-area * { visibility: visible; }
