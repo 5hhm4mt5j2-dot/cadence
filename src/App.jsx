@@ -713,17 +713,38 @@ export default class App extends React.Component {
   _woEditSave() {
     const w = this.state.workout; if (!w || !w.editSet) return;
     const es = w.editSet;
+    const xi = es.exIdx != null ? es.exIdx : w.exIdx;
     const reps = parseFloat(es.reps), weight = parseFloat(es.weight);
     if (!(reps > 0 && reps <= 100)) { this.showToast('Reps must be between 0.5 and 100.'); return; }
     if (!(weight >= 0 && weight <= 500)) { this.showToast('Weight must be between 0 and 500 kg.'); return; }
     const sess = this.state.sessions[w.day]; if (!sess) return;
     const exs = (sess.exercises || []).map(x => ({ ...x }));
-    const e = exs[w.exIdx]; const lg = (e.logged || []).slice();
+    const e = exs[xi]; if (!e) return; const lg = (e.logged || []).slice();
     if (lg[es.idx]) lg[es.idx] = { ...lg[es.idx], reps, weight };
-    exs[w.exIdx] = { ...e, logged: lg };
+    exs[xi] = { ...e, logged: lg };
     this.haptic(false);
     this.setState({ workout: { ...w, editSet: null } });
     this.save({ sessions: { ...this.state.sessions, [w.day]: { ...sess, exercises: exs } } });
+  }
+  // Undo the edited set: remove it and drop back into logging that slot (values
+  // prefilled) so the user can re-do it from scratch.
+  _woUndoSet() {
+    const w = this.state.workout; if (!w || !w.editSet) return;
+    const es = w.editSet;
+    const xi = es.exIdx != null ? es.exIdx : w.exIdx;
+    const sess = this.state.sessions[w.day]; if (!sess) return;
+    const exs = (sess.exercises || []).map(x => ({ ...x }));
+    const e = exs[xi]; if (!e) { this.setState({ workout: { ...w, editSet: null } }); return; }
+    const lg = (e.logged || []).slice();
+    const removed = lg[es.idx];
+    if (!removed) { this.setState({ workout: { ...w, editSet: null } }); return; }
+    lg.splice(es.idx, 1);
+    exs[xi] = { ...e, logged: lg };
+    this.haptic(false);
+    const setIdx = removed.set != null ? removed.set - 1 : lg.length;
+    this.setState({ workout: { day: w.day, exIdx: xi, setIdx, phase: 'set', reps: String(removed.reps != null ? removed.reps : (e.reps || 0)), weight: String(removed.weight != null ? removed.weight : (e.weight || 0)), editSet: null } });
+    this.save({ sessions: { ...this.state.sessions, [w.day]: { ...sess, exercises: exs } } });
+    this._woIdleReset();
   }
 
   startGreetPress() {
@@ -2044,6 +2065,11 @@ export default class App extends React.Component {
       const mmss = (t) => { t = Math.max(0, Math.round(t)); return Math.floor(t / 60) + ':' + String(t % 60).padStart(2, '0'); };
       const loggedCount = we ? (we.logged || []).length : 0;
       const lastLg = we ? (we.logged || [])[loggedCount - 1] : null;
+      // Most-recently logged (non-skipped) set across ALL exercises, so the set a
+      // user just logged stays correctable even after the exercise advances or the
+      // workout reaches its summary.
+      let gLast = null;
+      wexs.forEach((e, xi) => (e.logged || []).forEach((l, li) => { if (!l.skipped && (!gLast || (l.ts || 0) >= gLast.ts)) gLast = { exIdx: xi, idx: li, ts: l.ts || 0, set: l.set, reps: l.reps, weight: l.weight, name: e.name }; }));
       const liftRows = wexs.filter(e => !e.cardio);
       const sumRows = liftRows.map((e, i) => {
         const lg = (e.logged || []).filter(l => !l.skipped);
@@ -2057,7 +2083,7 @@ export default class App extends React.Component {
         setLine: we ? 'Set ' + (wk.setIdx + 1) + ' of ' + (we.sets || 0) : '',
         targetLine: we ? 'Target ' + (we.reps || 0) + ' reps × ' + (we.weight || 0) + ' kg' : '',
         dots: we ? Array.from({ length: we.sets || 0 }, (_, i) => ({ bg: i < loggedCount ? 'var(--accent)' : (i === wk.setIdx && phase === 'set' ? 'var(--text)' : 'var(--track)') })) : [],
-        phaseSet: phase === 'set', phaseRest: phase === 'rest' && !es, phaseReady: phase === 'ready', phaseSummary: phase === 'summary', editing: phase === 'rest' && !!es,
+        phaseSet: phase === 'set' && !es, phaseRest: phase === 'rest' && !es, phaseReady: phase === 'ready' && !es, phaseSummary: phase === 'summary' && !es, editing: !!es,
         reps: wk.reps || '', weight: wk.weight || '',
         onReps: (e) => this.setState(s2 => s2.workout ? { workout: { ...s2.workout, reps: e.target.value } } : null),
         onWeight: (e) => this.setState(s2 => s2.workout ? { workout: { ...s2.workout, weight: e.target.value } } : null),
@@ -2078,21 +2104,28 @@ export default class App extends React.Component {
         skipRest: () => this._woStartSet(), startSet: () => this._woStartSet(),
         startNLabel: 'Start set ' + (wk.setIdx + 1),
         restMore: () => this.setState(s2 => s2.workout ? { workout: { ...s2.workout, phase: 'rest', restLeft: wcfg.rest, restTotal: wcfg.rest, paused: false, editSet: null } } : null),
-        hasEditable: !!(lastLg && !lastLg.skipped),
-        justLogged: (lastLg && !lastLg.skipped) ? 'Set ' + lastLg.set + ' ✓ · ' + lastLg.reps + ' × ' + lastLg.weight + ' kg' : '',
-        lastSetN: lastLg ? lastLg.set : 0,
-        editLast: () => { if (!lastLg || lastLg.skipped) return; this.setState(s2 => s2.workout ? { workout: { ...s2.workout, editSet: { idx: loggedCount - 1, n: lastLg.set, reps: String(lastLg.reps), weight: String(lastLg.weight) } } } : null); },
+        hasEditable: !!gLast,
+        justLogged: gLast ? 'Set ' + gLast.set + ' ✓ · ' + gLast.reps + ' × ' + gLast.weight + ' kg' : '',
+        lastSetN: gLast ? gLast.set : 0,
+        editLast: () => { if (!gLast) return; this.setState(s2 => s2.workout ? { workout: { ...s2.workout, editSet: { exIdx: gLast.exIdx, idx: gLast.idx, n: gLast.set, reps: String(gLast.reps), weight: String(gLast.weight) } } } : null); },
         editN: es ? es.n : 0,
+        editExName: es ? ((wexs[es.exIdx] && wexs[es.exIdx].name) || '') : '',
+        editingRest: !!es && phase === 'rest',
+        editSub: (!!es && phase === 'rest') ? ('Timer keeps running · ' + mmss(wk.restLeft || 0) + ' left') : 'Fix the reps or weight, or undo to redo the set.',
         esReps: es ? es.reps : '', esWeight: es ? es.weight : '',
         onEsReps: (e) => this.setState(s2 => s2.workout && s2.workout.editSet ? { workout: { ...s2.workout, editSet: { ...s2.workout.editSet, reps: e.target.value } } } : null),
         onEsWeight: (e) => this.setState(s2 => s2.workout && s2.workout.editSet ? { workout: { ...s2.workout, editSet: { ...s2.workout.editSet, weight: e.target.value } } } : null),
         editSave: () => this._woEditSave(),
+        editUndo: () => this._woUndoSet(),
         editCancel: () => this.setState(s2 => s2.workout ? { workout: { ...s2.workout, editSet: null } } : null),
         sumRows, totVol: fmt(totVol),
         finish: () => { this.endWorkout(); this.setState({ confirmComplete: true }); },
         exit: () => this.endWorkout(phase === 'summary' ? null : 'Progress saved — resume anytime.'),
         activity: () => this._woIdleReset(),
-        dim: s.workoutIdle ? 'brightness(' + ((wcfg.idleDim || 30) / 100) + ') grayscale(.35)' : 'none',
+        // Idle dim: a black veil darkens the UI while the timer ring/number are
+        // lifted above it (z-index) so the countdown stays fully readable.
+        dim: s.workoutIdle ? 'grayscale(.35)' : 'none',
+        dimVeil: s.workoutIdle ? (1 - (wcfg.idleDim || 30) / 100) : 0,
         ctlOpacity: s.workoutIdle ? '0.25' : '1',
       };
     }

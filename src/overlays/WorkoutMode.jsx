@@ -5,6 +5,8 @@ export default function WorkoutMode({ v }) {
   const wo = v.wo;
   return (
     <div onTouchStart={wo.activity} onMouseDown={wo.activity} style={s(`position:absolute; inset:0; z-index:70; background:var(--bg); display:flex; flex-direction:column; padding-bottom:env(safe-area-inset-bottom); transition:filter .5s ease; filter:${wo.dim};`)}>
+      {/* idle-dim veil — sits above the UI but below the rest timer (z-index:11) so the countdown stays bright */}
+      <div style={s(`position:absolute; inset:0; background:#000; opacity:${wo.dimVeil}; pointer-events:none; z-index:5; transition:opacity .5s ease;`)}></div>
       <div style={s('height:max(52px, env(safe-area-inset-top)); flex:none;')}></div>
       <div style={s('flex:none; display:flex; align-items:flex-start; justify-content:space-between; gap:10px; padding:6px 20px 0;')}>
         <div style={s('min-width:0; display:flex; align-items:center; height:36px;')}>
@@ -43,6 +45,9 @@ export default function WorkoutMode({ v }) {
             <button onClick={wo.skipSet} style={s('flex:1; border:1px solid var(--border); cursor:pointer; background:var(--surface); color:var(--muted); font-family:inherit; font-size:13.5px; font-weight:700; padding:15px 0; border-radius:15px;')}>Skip set</button>
             <button onClick={wo.logSet} style={s('flex:2; border:none; cursor:pointer; background:var(--accent); color:#fff; font-family:inherit; font-size:14.5px; font-weight:800; padding:15px 0; border-radius:15px; transition:transform .1s ease;')}>{wo.logLabel}</button>
           </div>
+          {wo.hasEditable && (
+            <button onClick={wo.editLast} style={s('align-self:center; border:none; background:transparent; cursor:pointer; font-family:inherit; font-size:12.5px; font-weight:700; color:var(--muted); padding:2px 8px;')}>Fix last set (set {wo.lastSetN})</button>
+          )}
         </div>
       )}
 
@@ -54,7 +59,7 @@ export default function WorkoutMode({ v }) {
             <div style={s('font-size:17px; font-weight:800; color:var(--text); letter-spacing:-.02em; margin-top:4px;')}>{wo.exName}</div>
             <div style={s("font-family:'JetBrains Mono',monospace; font-size:11.5px; font-weight:700; color:var(--accent); margin-top:5px;")}>{wo.justLogged}</div>
           </div>
-          <div onClick={wo.togglePause} style={s('position:relative; width:224px; height:224px; cursor:pointer;')}>
+          <div onClick={wo.togglePause} style={s('position:relative; z-index:11; width:224px; height:224px; cursor:pointer;')}>
             <svg width="224" height="224" viewBox="0 0 224 224" style={s('transform:rotate(-90deg);')}>
               <circle cx="112" cy="112" r="98" fill="none" stroke="var(--track)" strokeWidth="10"></circle>
               <circle cx="112" cy="112" r="98" fill="none" stroke={wo.arcColor} strokeWidth="10" strokeLinecap="round" strokeDasharray={wo.circ} strokeDashoffset={wo.dash} style={s('transition:stroke-dashoffset 1s linear, stroke .3s ease;')}></circle>
@@ -80,8 +85,8 @@ export default function WorkoutMode({ v }) {
       {wo.editing && (
         <div style={s('flex:1; display:flex; flex-direction:column; justify-content:center; gap:16px; padding:0 22px 26px;')}>
           <div style={s('text-align:center;')}>
-            <div style={s('font-size:16px; font-weight:800; color:var(--text);')}>{wo.exName} — edit set {wo.editN}</div>
-            <div style={s('font-size:12px; font-weight:600; color:var(--muted); margin-top:3px;')}>Timer keeps running · {wo.time} left</div>
+            <div style={s('font-size:16px; font-weight:800; color:var(--text);')}>{wo.editExName} — edit set {wo.editN}</div>
+            <div style={s('font-size:12px; font-weight:600; color:var(--muted); margin-top:3px;')}>{wo.editSub}</div>
           </div>
           <div style={s('background:var(--surface); border:1px solid var(--border); border-radius:22px; padding:18px; box-shadow:var(--shadow); display:flex; flex-direction:column; gap:14px;')}>
             <div style={s('display:flex; align-items:center; gap:10px;')}>
@@ -101,6 +106,7 @@ export default function WorkoutMode({ v }) {
             <button onClick={wo.editCancel} style={s('flex:1; border:1px solid var(--border); cursor:pointer; background:var(--surface); color:var(--muted); font-family:inherit; font-size:13.5px; font-weight:700; padding:15px 0; border-radius:15px;')}>Cancel</button>
             <button onClick={wo.editSave} style={s('flex:2; border:none; cursor:pointer; background:var(--accent); color:#fff; font-family:inherit; font-size:14.5px; font-weight:800; padding:15px 0; border-radius:15px;')}>Save set</button>
           </div>
+          <button onClick={wo.editUndo} style={s('align-self:center; border:none; background:transparent; cursor:pointer; font-family:inherit; font-size:12.5px; font-weight:700; color:var(--danger, #c0564a); padding:2px 8px;')}>Undo &amp; re-log this set</button>
         </div>
       )}
 
@@ -139,6 +145,9 @@ export default function WorkoutMode({ v }) {
               </div>
             ))}
           </div>
+          {wo.hasEditable && (
+            <button onClick={wo.editLast} style={s('align-self:center; border:none; background:transparent; cursor:pointer; font-family:inherit; font-size:12.5px; font-weight:700; color:var(--muted); padding:2px 8px;')}>Fix last set (set {wo.lastSetN})</button>
+          )}
           <button onClick={wo.finish} style={s('width:100%; border:none; cursor:pointer; background:var(--text); color:var(--surface); font-family:inherit; font-size:14.5px; font-weight:800; padding:16px 0; border-radius:16px; margin-top:4px;')}>Finish &amp; rate effort</button>
         </div>
       )}
