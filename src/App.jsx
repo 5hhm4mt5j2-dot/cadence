@@ -835,8 +835,16 @@ export default class App extends React.Component {
       + '&query=' + encodeURIComponent(query)
       + '&pageSize=' + (pageSize || 8)
       + '&dataType=' + encodeURIComponent('Foundation,SR Legacy,Survey (FNDDS)');
-    const res = await fetch(url);
-    if (!res.ok) throw new Error('usda ' + res.status);
+    // USDA's edge throttles bursts with a transient nginx 400 (not 429), so a
+    // fast sequence of lookups (e.g. a multi-item meal) sees sporadic failures.
+    // Retry the transient statuses with backoff before giving up.
+    let res;
+    for (let attempt = 0; ; attempt++) {
+      res = await fetch(url);
+      if (res.ok) break;
+      if (attempt >= 3 || ![400, 429, 500, 502, 503].includes(res.status)) throw new Error('usda ' + res.status);
+      await new Promise(r => setTimeout(r, 400 * (attempt + 1)));
+    }
     const json = await res.json();
     return (json.foods || []).map(f => this._usdaToFood(f)).filter(Boolean);
   }
@@ -910,7 +918,11 @@ export default class App extends React.Component {
     this._setMa({ busy: true, error: '' });
     try {
       const items = [];
-      for (const part of parts) {
+      for (let i = 0; i < parts.length; i++) {
+        const part = parts[i];
+        // Space out multi-item lookups so we don't trip USDA's burst throttle
+        // (usdaSearch also retries, but pacing keeps the common case clean).
+        if (i > 0) await new Promise(r => setTimeout(r, 150));
         // Ask for a few results and take the first with usable macros — the very
         // top hit is sometimes a macro-less entry that _usdaToFood drops to null.
         const foods = await this.usdaSearch(part.name, 5);
