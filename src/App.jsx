@@ -829,7 +829,8 @@ export default class App extends React.Component {
 
   // ---- USDA FoodData Central ----
   async usdaSearch(query, pageSize) {
-    const key = (this.props.usdaApiKey || '').trim() || 'd2d392gnQVEh9d5apOjnR84Yz03rbmQD4lFmKVT0';
+    const key = (this.props.usdaApiKey || '').trim();
+    if (!key) throw new Error('usda no key'); // set VITE_USDA_API_KEY in .env.local
     const url = 'https://api.nal.usda.gov/fdc/v1/foods/search?api_key=' + encodeURIComponent(key)
       + '&query=' + encodeURIComponent(query)
       + '&pageSize=' + (pageSize || 8)
@@ -910,7 +911,9 @@ export default class App extends React.Component {
     try {
       const items = [];
       for (const part of parts) {
-        const foods = await this.usdaSearch(part.name, 1);
+        // Ask for a few results and take the first with usable macros — the very
+        // top hit is sometimes a macro-less entry that _usdaToFood drops to null.
+        const foods = await this.usdaSearch(part.name, 5);
         if (foods && foods[0]) {
           const f = foods[0];
           items.push({ food: f.name, qty: part.grams, pgP: f.p / 100, pgC: f.c / 100, pgF: f.f / 100, pgCal: f.cal / 100, estimated: !part.qtyFound });
@@ -990,7 +993,7 @@ export default class App extends React.Component {
         // A low top score means it's unsure -> fall through to manual entry.
         const best = ranked[0];
         if (!best || best.p < 0.04) throw new Error('no food recognised');
-        const matches = await this.usdaSearch(best.label.toLowerCase(), 1);
+        const matches = await this.usdaSearch(best.label.toLowerCase(), 5);
         if (!matches || !matches[0]) throw new Error('none in usda');
         const f = matches[0];
         const item = { food: f.name, qty: 180, pgP: f.p / 100, pgC: f.c / 100, pgF: f.f / 100, pgCal: f.cal / 100, estimated: true };
