@@ -849,6 +849,37 @@ export default class App extends React.Component {
     return (json.foods || []).map(f => this._usdaToFood(f)).filter(Boolean);
   }
 
+  // Open Food Facts text search — fallback for foods missing from USDA (its 1M+
+  // products cover exotic/international/branded items USDA's generic DB lacks).
+  // Returns the first product with usable macros in the same shape as usdaSearch.
+  async offSearchFood(query) {
+    try {
+      const url = 'https://world.openfoodfacts.org/cgi/search.pl?search_terms=' + encodeURIComponent(query)
+        + '&search_simple=1&action=process&json=1&page_size=5'
+        + '&fields=' + encodeURIComponent('product_name,generic_name,nutriments');
+      const res = await fetch(url);
+      if (!res.ok) return null;
+      const j = await res.json();
+      // Relevance guard: OFF's fuzzy popularity-ranked search will happily return
+      // unrelated products (e.g. "omelette" -> a fried-rice product). Require the
+      // label to actually appear in the matched name — a wrong macro is worse than
+      // falling through to manual entry.
+      const q = query.toLowerCase();
+      const terms = q.split(/\s+/).filter(w => w.length >= 4);
+      for (const p of (j.products || [])) {
+        const n = p.nutriments || {};
+        const cal = +n['energy-kcal_100g'] || (n['energy_100g'] ? +n['energy_100g'] / 4.184 : 0);
+        const c = +n.carbohydrates_100g || 0, prot = +n.proteins_100g || 0, fat = +n.fat_100g || 0;
+        if (!cal && !prot && !c && !fat) continue;
+        const raw = (p.product_name || p.generic_name || '').trim().toLowerCase();
+        const relevant = terms.length ? terms.some(t => raw.includes(t)) : raw.includes(q);
+        if (!raw || !relevant) continue;
+        return { name: raw.slice(0, 60).replace(/\b\w/g, m => m.toUpperCase()), cal, p: prot, c, f: fat };
+      }
+    } catch (e) {}
+    return null;
+  }
+
   _usdaToFood(f) {
     const get = (num) => {
       const n = (f.foodNutrients || []).find(x => String(x.nutrientNumber) === num);
@@ -1005,9 +1036,14 @@ export default class App extends React.Component {
         // A low top score means it's unsure -> fall through to manual entry.
         const best = ranked[0];
         if (!best || best.p < 0.04) throw new Error('no food recognised');
-        const matches = await this.usdaSearch(best.label.toLowerCase(), 5);
-        if (!matches || !matches[0]) throw new Error('none in usda');
-        const f = matches[0];
+        const label = best.label.toLowerCase();
+        // USDA first (government-verified generic macros); fall back to Open Food
+        // Facts for the many exotic/international dishes the model emits that USDA
+        // has no entry for. Tolerate a USDA hard-failure (throttle) via the catch.
+        let f = null;
+        try { const matches = await this.usdaSearch(label, 5); f = matches && matches[0]; } catch (e) {}
+        if (!f) f = await this.offSearchFood(label);
+        if (!f) throw new Error('no macros for label');
         const item = { food: f.name, qty: 180, pgP: f.p / 100, pgC: f.c / 100, pgF: f.f / 100, pgCal: f.cal / 100, estimated: true };
         this._setMa({ busy: false, items: [...this.state.mealAdd.items, item] });
       } catch (e) {
