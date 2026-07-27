@@ -150,6 +150,9 @@ function migrateArchive(arr) {
   });
 }
 const exVol = (e) => { if (e.cardio) return 0; const lg = e.logged || []; const sets = e.sets || 0; const t = (e.reps || 0) * (e.weight || 0); let v = 0; for (let i = 0; i < sets; i++) { const l = lg[i]; v += l ? (l.skipped ? 0 : (l.reps || 0) * (l.weight || 0)) : t; } return v; };
+// Numeric-input value: keep the field empty when cleared (so typing a fresh
+// digit replaces cleanly) instead of snapping back to a leading 0.
+const numOrEmpty = (raw, float) => { if (raw === '' || raw == null) return ''; const n = float ? parseFloat(raw) : parseInt(raw, 10); return Number.isNaN(n) ? '' : n; };
 const W_DEFAULTS = { rest: 90, vibrate: true, sound: 'ding', keepAwake: true, idleDelay: 10, idleDim: 30 };
 const scheme = (e) => e.cardio ? ((e.duration || 0) + ' min · ' + (e.intensity || 'Moderate')) : ((e.sets || 0) + ' × ' + (e.reps || 0) + ' × ' + (e.weight || 0) + 'kg');
 
@@ -374,4 +377,5 @@ export {
   seedSessions, seedExerciseDb, migrateExerciseDb, eqToOptions, eqLabel, KEY, BODY_PARTS,
   PLATE, MACRO_COLORS, ACTIVITY, ACTIVITY_MULT, GOALS, GOAL_RULES, DEFAULT_RECOVERY,
   RPE_SCALE, FOOD_DB, fmtKcal, mealMacroLine, GPU, itemMacros, sumItems, timeLabel,
+  numOrEmpty,
 };

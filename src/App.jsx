@@ -12,6 +12,7 @@ import {
   seedSessions, seedExerciseDb, migrateExerciseDb, eqToOptions, eqLabel, KEY, BODY_PARTS,
   PLATE, MACRO_COLORS, ACTIVITY, ACTIVITY_MULT, GOALS, GOAL_RULES, DEFAULT_RECOVERY,
   RPE_SCALE, FOOD_DB, fmtKcal, mealMacroLine, GPU, itemMacros, sumItems, timeLabel,
+  numOrEmpty,
 } from './lib/data';
 import { s } from './lib/helpers';
 import Shell from './components/Shell';
@@ -903,12 +904,23 @@ export default class App extends React.Component {
     });
   }
 
-  async _loadMobilenet() {
-    if (this._mobilenet) return this._mobilenet;
+  // Google AIY food_V1 — MobileNet V1 trained on 2024 food-dish classes (vs. the
+  // old ImageNet MobileNet, which almost never matched an actual meal). The model
+  // and its label map are self-hosted under /models, so inference is 100% local:
+  // no backend, no per-photo cost, works for any number of concurrent testers.
+  async _loadFoodModel() {
+    if (this._foodModel) return this._foodModel;
     await this._loadScript('https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js');
-    await this._loadScript('https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet@2.1.1/dist/mobilenet.min.js');
-    this._mobilenet = await window.mobilenet.load({ version: 2, alpha: 1.0 });
-    return this._mobilenet;
+    await this._loadScript('https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-tflite@0.0.1-alpha.9/dist/tf-tflite.min.js');
+    const base = (import.meta.env.BASE_URL || '/');
+    window.tflite.setWasmPath('https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-tflite@0.0.1-alpha.9/dist/');
+    const [model, labelsText] = await Promise.all([
+      window.tflite.loadTFLiteModel(base + 'models/food_v1.tflite'),
+      fetch(base + 'models/food_labels.txt').then(r => r.text()),
+    ]);
+    this._foodModel = model;
+    this._foodLabels = labelsText.split('\n').map(l => l.trim());
+    return this._foodModel;
   }
 
   classifyPhoto(ev) {
@@ -919,30 +931,39 @@ export default class App extends React.Component {
     const img = new Image();
     img.onload = async () => {
       try {
-        const model = await this._loadMobilenet();
-        const preds = await model.classify(img, 10);
+        const model = await this._loadFoodModel();
+        const tf = window.tf;
+        // Model input is uint8 RGB (192x192 for food_V1) — read the size off the
+        // model so we stay correct if the graph changes. tfjs-tflite handles the
+        // int32 -> uint8 quantization of the input for us.
+        const size = (model.inputs && model.inputs[0] && model.inputs[0].shape && model.inputs[0].shape[1]) || 192;
+        const out = tf.tidy(() => {
+          const input = tf.cast(tf.expandDims(tf.image.resizeBilinear(tf.browser.fromPixels(img), [size, size])), 'int32');
+          const res = model.predict(input);
+          return (res && res.dataSync) ? res : res[Object.keys(res)[0]];
+        });
+        const raw = Array.from(out.dataSync());
+        out.dispose();
         URL.revokeObjectURL(url);
-        const STOP = ['plate','dining table','tray','mixing bowl','soup bowl','bowl','cup','coffee mug','wooden spoon','ladle','frying pan','spatula','table','restaurant','menu','wine glass','goblet','beer glass','pitcher','saltshaker','plate rack','refrigerator','microwave','oven','stove','dishwasher','can opener','corkscrew','tobacco shop','grocery store','packet','carton','paper towel','napkin'];
-        const foods = [];
-        for (const p of preds) {
-          if (p.probability < 0.04) continue;
-          const label = String(p.className).split(',')[0].trim().toLowerCase();
-          if (STOP.includes(label)) continue;
-          foods.push(label);
-          if (foods.length >= 4) break;
-        }
-        if (!foods.length) throw new Error('no food recognised');
-        const grams = [180, 150, 120, 90];
-        const items = [];
-        for (let i = 0; i < foods.length; i++) {
-          const matches = await this.usdaSearch(foods[i], 1);
-          if (matches && matches[0]) {
-            const f = matches[0], g = grams[i] || 100;
-            items.push({ food: f.name, qty: g, pgP: f.p / 100, pgC: f.c / 100, pgF: f.f / 100, pgCal: f.cal / 100, estimated: true });
-          }
-        }
-        if (!items.length) throw new Error('none in usda');
-        this._setMa({ busy: false, items: [...this.state.mealAdd.items, ...items] });
+        // Output is a quantized score per class on an arbitrary scale; normalise by
+        // the total so we can reason about it as a probability distribution.
+        const total = raw.reduce((a, b) => a + b, 0) || 1;
+        // Rank classes, dropping the background class and untranslated
+        // knowledge-graph ids (e.g. "/m/0abc"); keep real dish names.
+        const ranked = raw
+          .map((p, i) => ({ p: p / total, label: this._foodLabels[i] || '' }))
+          .filter(x => x.label && x.label !== '__background__' && !x.label.startsWith('/'))
+          .sort((a, b) => b.p - a.p);
+        // food_V1 is a single-dish classifier: the top entries are competing
+        // guesses for the SAME dish, not separate foods — so take the best guess.
+        // A low top score means it's unsure -> fall through to manual entry.
+        const best = ranked[0];
+        if (!best || best.p < 0.04) throw new Error('no food recognised');
+        const matches = await this.usdaSearch(best.label.toLowerCase(), 1);
+        if (!matches || !matches[0]) throw new Error('none in usda');
+        const f = matches[0];
+        const item = { food: f.name, qty: 180, pgP: f.p / 100, pgC: f.c / 100, pgF: f.f / 100, pgCal: f.cal / 100, estimated: true };
+        this._setMa({ busy: false, items: [...this.state.mealAdd.items, item] });
       } catch (e) {
         URL.revokeObjectURL(url);
         this._setMa({ busy: false, error: "Couldn't identify foods in that photo — try a clearer shot or use the Text tab." });
@@ -1706,10 +1727,10 @@ export default class App extends React.Component {
       deleteDisplay: ef0.index === null ? 'none' : 'block',
       browseDisplay: (ef0.mode === 'session' && ef0.index === null) ? 'inline-flex' : 'none',
       onName: (e) => this.setState({ exForm: { ...s.exForm, name: e.target.value } }),
-      onSets: (e) => this.setState({ exForm: { ...s.exForm, sets: parseInt(e.target.value) || 0 } }),
-      onReps: (e) => this.setState({ exForm: { ...s.exForm, reps: parseInt(e.target.value) || 0 } }),
-      onWeight: (e) => this.setState({ exForm: { ...s.exForm, weight: parseFloat(e.target.value) || 0 } }),
-      onDuration: (e) => this.setState({ exForm: { ...s.exForm, duration: parseInt(e.target.value) || 0 } }),
+      onSets: (e) => this.setState({ exForm: { ...s.exForm, sets: numOrEmpty(e.target.value) } }),
+      onReps: (e) => this.setState({ exForm: { ...s.exForm, reps: numOrEmpty(e.target.value) } }),
+      onWeight: (e) => this.setState({ exForm: { ...s.exForm, weight: numOrEmpty(e.target.value, true) } }),
+      onDuration: (e) => this.setState({ exForm: { ...s.exForm, duration: numOrEmpty(e.target.value) } }),
     } : null;
 
     // session history
@@ -1764,8 +1785,8 @@ export default class App extends React.Component {
         pick: () => this.setState({ programAddForm: { ...s.programAddForm, variant: opt } }),
       })),
       sets: paf0.sets, reps: paf0.reps,
-      onSets: (e) => this.setState({ programAddForm: { ...s.programAddForm, sets: parseInt(e.target.value) || 0 } }),
-      onReps: (e) => this.setState({ programAddForm: { ...s.programAddForm, reps: parseInt(e.target.value) || 0 } }),
+      onSets: (e) => this.setState({ programAddForm: { ...s.programAddForm, sets: numOrEmpty(e.target.value) } }),
+      onReps: (e) => this.setState({ programAddForm: { ...s.programAddForm, reps: numOrEmpty(e.target.value) } }),
       days: DAYS.map(d => {
         const t = s.program[d].type; const n = s.program[d].exercises.length;
         return {
@@ -1838,9 +1859,9 @@ export default class App extends React.Component {
         ],
         cats, list, listEmpty: qa0.stage === 'browseList' && list.length === 0,
         sets: qa0.sets, reps: qa0.reps, duration: qa0.duration,
-        onSets: (e) => this.setState({ quickAdd: { ...this.state.quickAdd, sets: parseInt(e.target.value) || 0 } }),
-        onReps: (e) => this.setState({ quickAdd: { ...this.state.quickAdd, reps: parseInt(e.target.value) || 0 } }),
-        onDuration: (e) => this.setState({ quickAdd: { ...this.state.quickAdd, duration: parseInt(e.target.value) || 0 } }),
+        onSets: (e) => this.setState({ quickAdd: { ...this.state.quickAdd, sets: numOrEmpty(e.target.value) } }),
+        onReps: (e) => this.setState({ quickAdd: { ...this.state.quickAdd, reps: numOrEmpty(e.target.value) } }),
+        onDuration: (e) => this.setState({ quickAdd: { ...this.state.quickAdd, duration: numOrEmpty(e.target.value) } }),
         intensities: INTENSITIES.map(x => ({ label: x, bg: qa0.intensity === x ? TYPE_COLOR.Cardio : 'var(--surface-2)', color: qa0.intensity === x ? '#fff' : 'var(--text)', pick: () => this.setState({ quickAdd: { ...this.state.quickAdd, intensity: x } }) })),
         itemName: qa0.item ? qa0.item.name : '', configLabel,
         toRecur: () => this.setState({ quickAdd: { ...this.state.quickAdd, stage: 'recur' } }),
@@ -1896,8 +1917,13 @@ export default class App extends React.Component {
           this.setState({ dayConfirm: { day, to, targetType, scope, clearLabel, offset: mOff } });
         } else {
           this.applyDayConvert(day, targetType, scope, mOff);
-          this.setState({ dayMenu: null });
-          this.showToast(FULL[day] + ' is now a ' + toName[to] + ' day' + (scope === 'every' ? ' — every week.' : onceLabelSuffix));
+          if (targetType === 'Custom') {
+            // New lift day: let the user name it right away instead of leaving it "Custom".
+            this.setState({ dayMenu: null, tagRename: { day, value: (this.state.customLabels || {})[day] || '' } });
+          } else {
+            this.setState({ dayMenu: null });
+            this.showToast(FULL[day] + ' is now a ' + toName[to] + ' day' + (scope === 'every' ? ' — every week.' : onceLabelSuffix));
+          }
         }
       };
       dm = {
@@ -1938,8 +1964,12 @@ export default class App extends React.Component {
         confirmYes: () => {
           const c = this.state.dayConfirm; if (!c) return;
           this.applyDayConvert(c.day, c.targetType, c.scope, c.offset || 0);
-          this.setState({ dayConfirm: null, dayMenu: null });
-          this.showToast(FULL[c.day] + ' is now a ' + toName[c.to] + ' day' + (c.scope === 'every' ? ' — every week.' : onceLabelSuffix));
+          if (c.targetType === 'Custom') {
+            this.setState({ dayConfirm: null, dayMenu: null, tagRename: { day: c.day, value: (this.state.customLabels || {})[c.day] || '' } });
+          } else {
+            this.setState({ dayConfirm: null, dayMenu: null });
+            this.showToast(FULL[c.day] + ' is now a ' + toName[c.to] + ' day' + (c.scope === 'every' ? ' — every week.' : onceLabelSuffix));
+          }
         },
         confirmCancel: () => this.setState({ dayConfirm: null }),
       };
