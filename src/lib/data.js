@@ -14,6 +14,15 @@ const MOON = 'M20 13.2A8 8 0 1 1 10.8 4 6.3 6.3 0 0 0 20 13.2z';
 const TYPE_ICON = { Push: DUMBBELL, Pull: DUMBBELL, Legs: DUMBBELL, Cardio: HEART, Custom: DUMBBELL, Rest: MOON };
 const INTENSITIES = ['Easy', 'Moderate', 'Hard'];
 const typeLabel = (t) => t === 'Legs' ? 'Leg' : t;
+// Display label for a day's type. A Custom day shows the user's own name
+// (customLabels[dayKey]) instead of the literal word "Custom". Pass withDay for
+// the "… day" phrasing used in schedule rows ("Push day", "Rest day"); a named
+// custom day stays just its name ("Arms Day"), never "Arms Day day".
+const dayTypeName = (type, dayKey, customLabels, withDay) => {
+  if (type === 'Custom' && customLabels && customLabels[dayKey]) return customLabels[dayKey];
+  if (!withDay) return typeLabel(type);
+  return type === 'Rest' ? 'Rest day' : typeLabel(type) + ' day';
+};
 const TUT_STEPS = [
   { title: 'Welcome to Cadence', text: "Welcome to Cadence, your personal fitness companion. We'll walk you through every feature in just a few minutes. This app is built for tracking lifts, cardio, nutrition and recovery. Everything stays private on your device. Let's get started." },
   { title: 'Your Profile', text: "This is your personal greeting. It changes throughout the day based on when you're training. Long-press it anytime to edit your profile, update your weight, age or training goals, and your daily nutrition targets adjust automatically.", target: 'greet' },
@@ -34,7 +43,7 @@ const TUT_STEPS = [
   { title: 'Barcode Scanning', text: "Tap the barcode button to scan any food packaging. Point your camera at the barcode and the app instantly looks it up. You'll see the food name, nutrition facts and serving size. Adjust the quantity if you're eating more or less than one serving, then tap Confirm. It's the fastest way to log packaged foods accurately." },
   { title: 'Privacy, Backup and Feedback', text: "Your health data is stored locally on your device and never leaves the app. Nothing is encrypted or sent anywhere. You can export your data anytime as a backup and import it on a new device. Use the Feedback tab to report bugs or suggest features. Everything you do here is just for you. Ready to train?", target: 'menu', final: true },
 ];
-const ONB_DEFAULTS = { name: '', sex: 'Male', age: '', height: '', weight: '', goal: 'Maintain', activity: 'Moderately Active' };
+const ONB_DEFAULTS = { name: '', sex: 'Male', age: '', height: '', weight: '', goal: 'Maintain', pace: 'Moderate', activity: 'Moderately Active' };
 
 const DEFAULT_EX = {
   Push: [
@@ -319,8 +328,19 @@ const PLATE = 'M12 7.5a4.5 4.5 0 1 1 0 9 4.5 4.5 0 0 1 0-9z M3.2 3v4a1.3 1.3 0 0
 const MACRO_COLORS = { p: '#6E8B7E', c: '#C0895A', f: '#B0715E' };
 const ACTIVITY = ['Sedentary', 'Lightly Active', 'Moderately Active', 'Very Active', 'Extremely Active'];
 const ACTIVITY_MULT = { 'Sedentary': 1.2, 'Lightly Active': 1.375, 'Moderately Active': 1.55, 'Very Active': 1.725, 'Extremely Active': 1.9 };
-const GOALS = ['Lose Weight', 'Maintain', 'Gain Muscle'];
-const GOAL_RULES = { 'Lose Weight': { pk: 1.6, c: .40, f: .25, adj: -.15 }, 'Maintain': { pk: 1.6, c: .45, f: .30, adj: 0 }, 'Gain Muscle': { pk: 1.8, c: .50, f: .25, adj: .10 } };
+const GOALS = ['Lose Weight', 'Maintain', 'Gain Muscle', 'Body Recomposition'];
+const PACES = ['Moderate', 'Aggressive'];
+// pk = protein g/kg bodyweight · c/f = carb/fat share of calories · adj = calorie
+// delta vs TDEE. Lose Weight / Gain Muscle expose a pace that scales the deficit
+// or surplus (evidence-based ~15-25% deficit, ~10-20% surplus). Body
+// Recomposition eats at maintenance but with a higher protein target to drive
+// simultaneous fat loss and muscle gain.
+const GOAL_RULES = {
+  'Lose Weight': { pk: 1.6, c: .40, f: .25, adj: -.15, paces: { Moderate: -.15, Aggressive: -.25 } },
+  'Maintain': { pk: 1.6, c: .45, f: .30, adj: 0 },
+  'Gain Muscle': { pk: 1.8, c: .50, f: .25, adj: .10, paces: { Moderate: .10, Aggressive: .20 } },
+  'Body Recomposition': { pk: 2.2, c: .40, f: .25, adj: 0 },
+};
 const DEFAULT_RECOVERY = { tolerance: 'moderate', learned_consecutive_days: 2, learned_weekly_load_threshold: 40, confidence: 0, sample_size: 0, last_updated: null };
 const RPE_SCALE = [
   { n: 1, label: 'Very easy', sub: 'Warm-up level' },
@@ -372,7 +392,8 @@ const timeLabel = (ts) => new Date(ts).toLocaleTimeString('en-US', { hour: 'nume
 
 export {
   DAYS, FULL, TYPES, TYPE_COLOR, TYPE_TINT, DUMBBELL, SNEAKER, HEART, MOON, TYPE_ICON,
-  INTENSITIES, typeLabel, TUT_STEPS, ONB_DEFAULTS, DEFAULT_EX, CARDIO_TYPES, seedCardioDb,
+  INTENSITIES, typeLabel, dayTypeName, TUT_STEPS, ONB_DEFAULTS, DEFAULT_EX, CARDIO_TYPES, seedCardioDb,
+  PACES,
   migrateCardioDb, fmt, fmtDate, MONTH_ABBR, migrateArchive, exVol, W_DEFAULTS, scheme,
   seedSessions, seedExerciseDb, migrateExerciseDb, eqToOptions, eqLabel, KEY, BODY_PARTS,
   PLATE, MACRO_COLORS, ACTIVITY, ACTIVITY_MULT, GOALS, GOAL_RULES, DEFAULT_RECOVERY,

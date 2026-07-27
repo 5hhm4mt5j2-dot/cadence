@@ -149,6 +149,19 @@ export function Onboarding({ v }) {
             {onb.goalOptions.map((op, i) => (
               <button key={i} onClick={op.set} style={s(`text-align:left; border:none; cursor:pointer; font-family:inherit; font-size:14.5px; font-weight:700; padding:16px 18px; border-radius:14px; background:${op.bg}; color:${op.color};`)}>{op.label}</button>
             ))}
+            {onb.showPace && (
+              <div style={s('margin-top:8px;')}>
+                <div style={s('font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin:6px 2px 8px;')}>{onb.paceLabel}</div>
+                <div style={s('display:flex; gap:9px;')}>
+                  {onb.paceOptions.map((op, i) => (
+                    <button key={i} onClick={op.set} style={s(`flex:1; text-align:left; border:none; cursor:pointer; font-family:inherit; padding:13px 15px; border-radius:13px; background:${op.bg}; color:${op.color};`)}>
+                      <div style={s('font-size:14px; font-weight:800;')}>{op.label}</div>
+                      <div style={s('font-size:10.5px; font-weight:600; opacity:.8; margin-top:2px;')}>{op.sub}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
         {onb.s4 && (

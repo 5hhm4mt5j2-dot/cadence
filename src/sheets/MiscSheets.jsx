@@ -116,11 +116,24 @@ export function ProfileEditSheet({ v }) {
           ))}
         </div>
         <div style={s('font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin:16px 0 6px;')}>Goal</div>
-        <div style={s('display:flex; gap:8px;')}>
+        <div style={s('display:flex; flex-wrap:wrap; gap:8px;')}>
           {pf.goalOptions.map((op, i) => (
-            <button key={i} onClick={op.set} style={s(`flex:1; border:none; cursor:pointer; font-family:inherit; font-size:11.5px; font-weight:700; padding:10px 4px; border-radius:11px; background:${op.bg}; color:${op.color};`)}>{op.label}</button>
+            <button key={i} onClick={op.set} style={s(`flex:1 1 45%; border:none; cursor:pointer; font-family:inherit; font-size:11.5px; font-weight:700; padding:11px 6px; border-radius:11px; background:${op.bg}; color:${op.color};`)}>{op.label}</button>
           ))}
         </div>
+        {pf.showPace && (
+          <>
+            <div style={s('font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin:16px 0 6px;')}>{pf.paceLabel}</div>
+            <div style={s('display:flex; gap:8px;')}>
+              {pf.paceOptions.map((op, i) => (
+                <button key={i} onClick={op.set} style={s(`flex:1; text-align:left; border:none; cursor:pointer; font-family:inherit; padding:11px 13px; border-radius:11px; background:${op.bg}; color:${op.color};`)}>
+                  <div style={s('font-size:12.5px; font-weight:800;')}>{op.label}</div>
+                  <div style={s('font-size:10px; font-weight:600; opacity:.8; margin-top:2px;')}>{op.sub}</div>
+                </button>
+              ))}
+            </div>
+          </>
+        )}
         <div style={s('font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin:16px 0 6px;')}>Activity level</div>
         <div style={s('display:flex; flex-direction:column; gap:8px;')}>
           {pf.activityOptions.map((op, i) => (

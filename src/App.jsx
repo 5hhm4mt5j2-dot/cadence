@@ -7,7 +7,8 @@
 import React from 'react';
 import {
   DAYS, FULL, TYPES, TYPE_COLOR, TYPE_TINT, DUMBBELL, SNEAKER, HEART, MOON, TYPE_ICON,
-  INTENSITIES, typeLabel, TUT_STEPS, ONB_DEFAULTS, DEFAULT_EX, CARDIO_TYPES, seedCardioDb,
+  INTENSITIES, typeLabel, dayTypeName, TUT_STEPS, ONB_DEFAULTS, DEFAULT_EX, CARDIO_TYPES, seedCardioDb,
+  PACES,
   migrateCardioDb, fmt, fmtDate, MONTH_ABBR, migrateArchive, exVol, W_DEFAULTS, scheme,
   seedSessions, seedExerciseDb, migrateExerciseDb, eqToOptions, eqLabel, KEY, BODY_PARTS,
   PLATE, MACRO_COLORS, ACTIVITY, ACTIVITY_MULT, GOALS, GOAL_RULES, DEFAULT_RECOVERY,
@@ -392,9 +393,12 @@ export default class App extends React.Component {
 
   addExerciseToProgram(day, item) {
     const p = this.state.program[day];
-    const type = p.type === 'Rest' ? 'Custom' : p.type;
+    const wasRest = p.type === 'Rest';
+    const type = wasRest ? 'Custom' : p.type;
     const exercises = (p.exercises || []).concat([{ ...item }]);
     this.updateProgramDay(day, { type, exercises });
+    // A Rest day just became a Custom training day — prompt for a real name.
+    if (wasRest && !((this.state.customLabels || {})[day])) this.setState({ tagRename: { day, value: '' } });
   }
 
   addCardioToProgram(day, item) {
@@ -532,6 +536,7 @@ export default class App extends React.Component {
       const ex = cardio ? { ...item, cardio: true } : { ...item };
       sessions[day] = { ...prev, exercises: (prev.exercises || []).concat([ex]) };
       this.save({ week, sessions });
+      if (type === 'Custom' && (!prevType || prevType === 'Rest') && !((this.state.customLabels || {})[day])) this.setState({ tagRename: { day, value: '' } });
       return;
     }
     const view = this.viewWeek(offset);
@@ -541,6 +546,7 @@ export default class App extends React.Component {
     const ex = cardio ? { ...item, cardio: true } : { ...item };
     const session = { ...base, exercises: (base.exercises || []).concat([ex]) };
     this.save({ weekOverrides: this.writeOverride(offset, day, type, session) });
+    if (type === 'Custom' && (!prevType || prevType === 'Rest') && !((this.state.customLabels || {})[day])) this.setState({ tagRename: { day, value: '' } });
   }
 
   // Day type conversion: 'every' rewrites the recurring template; 'once' only the displayed week
@@ -790,8 +796,12 @@ export default class App extends React.Component {
     const bmr = 10 * w + 6.25 * h - 5 * age + (f.sex === 'Male' ? 5 : (f.sex === 'Female' ? -161 : -78));
     const tdee = Math.round(bmr * (ACTIVITY_MULT[f.activity] || 1.55));
     const r = GOAL_RULES[f.goal] || GOAL_RULES.Maintain;
-    const cal = Math.round(tdee * (1 + r.adj));
-    return { name: (f.name || '').trim(), height: h, weight: w, age, sex: f.sex, goal: f.goal, activity: f.activity, tdee, calories: cal, protein: Math.round(r.pk * w), carbs: Math.round(cal * r.c / 4), fat: Math.round(cal * r.f / 9) };
+    // Paced goals (Lose Weight / Gain Muscle) scale the deficit/surplus; others
+    // ignore pace. Default to Moderate for a paced goal with no pace set yet.
+    const pace = r.paces ? (r.paces[f.pace] != null ? f.pace : 'Moderate') : null;
+    const adj = pace ? r.paces[pace] : r.adj;
+    const cal = Math.round(tdee * (1 + adj));
+    return { name: (f.name || '').trim(), height: h, weight: w, age, sex: f.sex, goal: f.goal, pace, activity: f.activity, tdee, calories: cal, protein: Math.round(r.pk * w), carbs: Math.round(cal * r.c / 4), fat: Math.round(cal * r.f / 9) };
   }
 
   _setMa(p) { if (this.state.mealAdd) this.setState({ mealAdd: { ...this.state.mealAdd, ...p } }); }
@@ -1386,6 +1396,7 @@ export default class App extends React.Component {
 
   renderVals() {
     const s = this.state;
+    const cl = s.customLabels || {};
     const now = new Date();
     const hour = now.getHours();
     const isNightTime = hour < 6 || hour >= 19;
@@ -1448,7 +1459,7 @@ export default class App extends React.Component {
       const sess = wView.sessions[d];
       const openThis = isCurWeek ? openDay(d) : () => { this.haptic(false); this.setState({ dayMenu: { day: d, scope: 'once', source: 'week', offset: wOff }, dayConfirm: null }); };
       return {
-        key: d, letter: d.charAt(0), short: training ? t : 'Rest', full: FULL[d],
+        key: d, letter: d.charAt(0), short: training ? dayTypeName(t, d, cl, false) : 'Rest', full: FULL[d],
         chipBg: training ? TYPE_TINT[t] : 'var(--surface-2)',
         chipRing: isToday ? ('0 0 0 2px ' + (training ? TYPE_COLOR[t] : 'var(--muted)')) : 'none',
         dot: training ? TYPE_COLOR[t] : 'var(--border)',
@@ -1458,7 +1469,7 @@ export default class App extends React.Component {
         iconColor: training ? TYPE_COLOR[t] : 'var(--muted)',
         iconPath: training ? DUMBBELL : MOON,
         divider: i === DAYS.length - 1 ? 'transparent' : 'var(--border)',
-        rowSub: (training ? ((t === 'Custom' && (this.state.customLabels || {})[d]) || (t + ' day')) : 'Rest day') + (moved ? ' · this week only' : ''),
+        rowSub: (training ? dayTypeName(t, d, cl, true) : 'Rest day') + (moved ? ' · this week only' : ''),
         rowRight: training && sess ? (sess.completed ? 'Done' : fmt(this.weekVolume({ x: sess }))) : '',
         open: openThis,
         openMenu: () => { this.haptic(false); this.setState({ dayMenu: { day: d, scope: 'once', source: 'week', offset: wOff }, dayConfirm: null }); },
@@ -1570,7 +1581,7 @@ export default class App extends React.Component {
         iconBorder: empty ? '1.5px dashed var(--border)' : 'none',
         nameColor: empty ? 'var(--muted)' : 'var(--text)',
         subColor: empty ? 'var(--faint)' : 'var(--muted)',
-        sub: empty ? 'Empty — tap to set up' : (typeLabel(p.type) + ' day · ' + p.exercises.length + ' exercise' + (p.exercises.length === 1 ? '' : 's')),
+        sub: empty ? 'Empty — tap to set up' : (dayTypeName(p.type, d, cl, true) + ' · ' + p.exercises.length + ' exercise' + (p.exercises.length === 1 ? '' : 's')),
         divider: i === DAYS.length - 1 ? 'transparent' : 'var(--border)',
         chevronDisplay: empty ? 'none' : 'inline',
         addDisplay: empty ? 'inline-flex' : 'none',
@@ -1586,10 +1597,16 @@ export default class App extends React.Component {
       pdx = {
         full: FULL[apd],
         typeOptions: TYPES.map(t => ({
-          label: typeLabel(t),
+          // Show the user's own name on the Custom chip once it's set/active.
+          label: (t === 'Custom' && p.type === 'Custom' && cl[apd]) ? cl[apd] : typeLabel(t),
           bg: p.type === t ? TYPE_COLOR[t] : 'var(--surface-2)',
           color: p.type === t ? '#fff' : 'var(--muted)',
-          set: () => this.updateProgramDay(apd, { type: t }),
+          // Picking "Custom" opens the naming prompt so the day gets a real name
+          // instead of the literal word "Custom".
+          set: () => {
+            this.updateProgramDay(apd, { type: t });
+            if (t === 'Custom') this.setState({ tagRename: { day: apd, value: (this.state.customLabels || {})[apd] || '' } });
+          },
         })),
         showExercises: training,
         hasExercises: p.exercises.length > 0,
@@ -1709,7 +1726,7 @@ export default class App extends React.Component {
         label: aw.label, volume: fmt(tv), count: aw.sessions.length,
         sessions: aw.sessions.map(se => {
           let v = 0; se.exercises.forEach(e => { v += exVol(e); });
-          return { title: FULL[se.day] + ' · ' + typeLabel(se.type), volume: fmt(v), hasDate: !!se.date, dateLabel: se.date ? fmtDate(se.date) : '', exercises: se.exercises.map((e, i) => ({ name: e.name, scheme: scheme(e), divider: i === se.exercises.length - 1 ? 'transparent' : 'var(--border)' })) };
+          return { title: FULL[se.day] + ' · ' + dayTypeName(se.type, se.day, cl, false), volume: fmt(v), hasDate: !!se.date, dateLabel: se.date ? fmtDate(se.date) : '', exercises: se.exercises.map((e, i) => ({ name: e.name, scheme: scheme(e), divider: i === se.exercises.length - 1 ? 'transparent' : 'var(--border)' })) };
         }),
       };
     }
@@ -1736,7 +1753,7 @@ export default class App extends React.Component {
     // session history
     const sortedHistory = (s.sessionHistory || []).slice().sort((a, b) => (a.date < b.date ? 1 : -1));
     const historyEntries = sortedHistory.map(h => ({
-      title: FULL[h.day] + ' · ' + typeLabel(h.type),
+      title: FULL[h.day] + ' · ' + dayTypeName(h.type, h.day, cl, false),
       dateLabel: fmtDate(h.date),
       volume: fmt(h.volume),
       exercises: h.exercises.map((e, i) => ({ name: e.name, scheme: scheme(e), divider: i === h.exercises.length - 1 ? 'transparent' : 'var(--border)' })),
@@ -1790,7 +1807,7 @@ export default class App extends React.Component {
       days: DAYS.map(d => {
         const t = s.program[d].type; const n = s.program[d].exercises.length;
         return {
-          label: FULL[d] + ' – ' + (t === 'Rest' ? 'Rest day' : typeLabel(t) + ' Day'),
+          label: FULL[d] + ' – ' + ((t === 'Custom' && cl[d]) ? cl[d] : (t === 'Rest' ? 'Rest day' : typeLabel(t) + ' Day')),
           sub: t === 'Rest' ? '' : (n + ' exercise' + (n === 1 ? '' : 's')),
           bg: paf0.day === d ? 'var(--accent)' : 'var(--surface-2)', color: paf0.day === d ? '#fff' : 'var(--text)',
           pick: () => this.setState({ programAddForm: { ...s.programAddForm, day: d } }),
@@ -1905,7 +1922,7 @@ export default class App extends React.Component {
       const hasActivities = exs.length > 0;
       const scope = dm0.scope;
       const onceLabelSuffix = mOff ? ' — that week.' : ' — this week.';
-      const curLabel = type === 'Rest' ? 'Rest day' : (typeLabel(type) + ' day');
+      const curLabel = dayTypeName(type, day, cl, true);
       const clearParts = [];
       if (strengthN) clearParts.push(strengthN + ' exercise' + (strengthN === 1 ? '' : 's'));
       if (cardioN) clearParts.push(cardioN + ' cardio/sport' + (cardioN === 1 ? '' : 's'));
@@ -1980,7 +1997,7 @@ export default class App extends React.Component {
       const disabled = breakMode && occupied;
       return {
         full: FULL[d],
-        current: occupied ? typeLabel(s.week[d]) + ' day' : 'Rest',
+        current: occupied ? dayTypeName(s.week[d], d, cl, true) : 'Rest',
         divider: i === arr.length - 1 ? 'transparent' : 'var(--border)',
         rowOpacity: disabled ? 0.4 : 1,
         rowCursor: disabled ? 'not-allowed' : 'pointer',
@@ -2134,9 +2151,10 @@ export default class App extends React.Component {
       calPct: calPctNum + '%',
       calColor: 'var(--muted)',
     };
-    const pfDefaults = { name: '', height: '', weight: '', age: '', sex: 'Male', goal: 'Maintain', activity: 'Moderately Active' };
+    const pfDefaults = { name: '', height: '', weight: '', age: '', sex: 'Male', goal: 'Maintain', pace: 'Moderate', activity: 'Moderately Active' };
     const pfd = s.profileForm || (prof ? null : pfDefaults);
     const setPf = (patch) => this.setState({ profileForm: { ...(this.state.profileForm || pfDefaults), ...patch } });
+    const pfPaced = pfd && GOAL_RULES[pfd.goal] && GOAL_RULES[pfd.goal].paces;
     const pf = pfd ? {
       name: pfd.name, height: pfd.height, weight: pfd.weight, age: pfd.age,
       onName: (e) => setPf({ name: e.target.value }),
@@ -2145,6 +2163,9 @@ export default class App extends React.Component {
       onAge: (e) => setPf({ age: e.target.value }),
       sexOptions: ['Male', 'Female'].map(x => ({ label: x, bg: pfd.sex === x ? 'var(--accent)' : 'var(--surface-2)', color: pfd.sex === x ? '#fff' : 'var(--muted)', set: () => setPf({ sex: x }) })),
       goalOptions: GOALS.map(x => ({ label: x, bg: pfd.goal === x ? 'var(--accent)' : 'var(--surface-2)', color: pfd.goal === x ? '#fff' : 'var(--muted)', set: () => setPf({ goal: x }) })),
+      showPace: !!pfPaced,
+      paceLabel: pfd.goal === 'Lose Weight' ? 'Deficit pace' : 'Surplus pace',
+      paceOptions: pfPaced ? PACES.map(x => ({ label: x, sub: pfd.goal === 'Lose Weight' ? (x === 'Moderate' ? '~15% deficit' : '~25% deficit') : (x === 'Moderate' ? '~10% surplus' : '~20% surplus'), bg: (pfd.pace || 'Moderate') === x ? 'var(--accent)' : 'var(--surface-2)', color: (pfd.pace || 'Moderate') === x ? '#fff' : 'var(--muted)', set: () => setPf({ pace: x }) })) : [],
       activityOptions: ACTIVITY.map(x => ({ label: x, bg: pfd.activity === x ? 'var(--accent)' : 'var(--surface-2)', color: pfd.activity === x ? '#fff' : 'var(--muted)', set: () => setPf({ activity: x }) })),
       save: () => {
         const f = { ...pfDefaults, ...(this.state.profileForm || {}) };
@@ -2204,6 +2225,9 @@ export default class App extends React.Component {
       onWeight: (e) => setOnb({ weight: e.target.value }),
       sexOptions: optBuild(['Male', 'Female'], 'sex'),
       goalOptions: optBuild(GOALS, 'goal'),
+      showPace: !!(GOAL_RULES[onf.goal] && GOAL_RULES[onf.goal].paces),
+      paceLabel: onf.goal === 'Lose Weight' ? 'How aggressive a deficit?' : 'How aggressive a surplus?',
+      paceOptions: (GOAL_RULES[onf.goal] && GOAL_RULES[onf.goal].paces) ? PACES.map(x => ({ label: x, sub: onf.goal === 'Lose Weight' ? (x === 'Moderate' ? '~15% below maintenance' : '~25% below maintenance') : (x === 'Moderate' ? '~10% above maintenance' : '~20% above maintenance'), bg: (onf.pace || 'Moderate') === x ? 'var(--accent)' : 'var(--surface-2)', color: (onf.pace || 'Moderate') === x ? '#fff' : 'var(--muted)', set: () => setOnb({ pace: x }) })) : [],
       activityOptions: optBuild(ACTIVITY, 'activity'),
       canBack: step > 0,
       back: () => this.setState({ onbStep: Math.max(0, (this.state.onbStep || 0) - 1) }),
@@ -2238,10 +2262,10 @@ export default class App extends React.Component {
         { label: 'Age', value: String(prof.age) },
         { label: 'Height', value: prof.height + ' cm' },
         { label: 'Weight', value: prof.weight + ' kg' },
-        { label: 'Goal', value: prof.goal },
+        { label: 'Goal', value: prof.goal + (prof.pace ? ' · ' + prof.pace : '') },
         { label: 'Activity', value: prof.activity },
       ],
-      edit: () => this.setState({ profileMenu: false, profileEditOpen: true, profileForm: { name: prof.name || '', height: String(prof.height), weight: String(prof.weight), age: String(prof.age), sex: prof.sex, goal: prof.goal, activity: prof.activity } }),
+      edit: () => this.setState({ profileMenu: false, profileEditOpen: true, profileForm: { name: prof.name || '', height: String(prof.height), weight: String(prof.weight), age: String(prof.age), sex: prof.sex, goal: prof.goal, pace: prof.pace || 'Moderate', activity: prof.activity } }),
       exportData: () => this.exportData(),
       importData: () => this.pickImport('menu'),
       recoveryProfile: () => this.setState({ profileMenu: false, recoveryView: true }),
@@ -2551,13 +2575,13 @@ export default class App extends React.Component {
       onArchive: screen === 'archive', onArchiveDetail: screen === 'archiveDetail',
       onCardioDb: screen === 'cardioDb', onCardioDbDetail: screen === 'cardioDbDetail',
       headerTitle: ({ week: 'Lifts', session: 'Lifts', program: 'Current Program', programDay: pdx ? pdx.full : '', history: 'Session History', database: 'Exercise Database', databaseDetail: dbMeta ? dbMeta.label : '', archive: 'Archive', archiveDetail: 'Archive', meals: 'Meals', cardioDb: 'Cardio', cardioDbDetail: s.activeCardioType || 'Cardio' })[screen] || 'Lifts',
-      headerSub: ({ week: tTrain ? typeLabel(tt) + ' day today' : 'Rest day today', session: restState ? 'Rest day' : 'Log your session', program: 'Recurring split', programDay: 'Label & exercises', history: 'Logged sessions', database: 'Body parts', databaseDetail: 'Exercises', archive: 'History', archiveDetail: 'History', meals: 'Nutrition & macros', cardioDb: 'Activities by type', cardioDbDetail: 'Activities' })[screen] || '',
+      headerSub: ({ week: tTrain ? dayTypeName(tt, tk, cl, true) + ' today' : 'Rest day today', session: restState ? 'Rest day' : 'Log your session', program: 'Recurring split', programDay: 'Label & exercises', history: 'Logged sessions', database: 'Body parts', databaseDetail: 'Exercises', archive: 'History', archiveDetail: 'History', meals: 'Nutrition & macros', cardioDb: 'Activities by type', cardioDbDetail: 'Activities' })[screen] || '',
       onMeals: screen === 'meals',
       mealsSetup: screen === 'meals' && (!prof || !!s.profileForm),
       mealsMain: screen === 'meals' && !!prof && !s.profileForm,
       pf, mx, nw, ma, md, exd,
       openMeals: () => this.setState({ screen: 'meals', menuOpen: false }),
-      editProfile: () => this.setState({ profileEditOpen: true, profileForm: { name: prof ? prof.name : '', height: String(prof ? prof.height : ''), weight: String(prof ? prof.weight : ''), age: String(prof ? prof.age : ''), sex: prof ? prof.sex : 'Male', goal: prof ? prof.goal : 'Maintain', activity: prof ? prof.activity : 'Moderately Active' } }),
+      editProfile: () => this.setState({ profileEditOpen: true, profileForm: { name: prof ? prof.name : '', height: String(prof ? prof.height : ''), weight: String(prof ? prof.weight : ''), age: String(prof ? prof.age : ''), sex: prof ? prof.sex : 'Male', goal: prof ? prof.goal : 'Maintain', pace: (prof && prof.pace) || 'Moderate', activity: prof ? prof.activity : 'Moderately Active' } }),
       openExport: () => this.setState({ exportForm: { from: new Date(Date.now() - 6 * 86400000).toISOString().slice(0, 10), to: todayISO } }),
       exportOpen: !!exf,
       closeExport: () => this.setState({ exportForm: null }),
