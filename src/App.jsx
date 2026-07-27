@@ -1407,12 +1407,12 @@ export default class App extends React.Component {
     let sessions = this.state.sessions;
     if (r.cardio && r.cardio.length) {
       const exs = (history[idx].exercises || []).map(x => ({ ...x }));
-      r.cardio.forEach(c => { if (exs[c.idx]) exs[c.idx] = { ...exs[c.idx], duration: c.duration, intensity: c.intensity }; });
+      r.cardio.forEach(c => { if (exs[c.idx]) exs[c.idx] = { ...exs[c.idx], duration: c.duration || 0, intensity: c.intensity }; });
       history[idx] = { ...history[idx], exercises: exs };
       const live = this.state.sessions[r.day];
       if (live) {
         const lexs = (live.exercises || []).map(x => ({ ...x }));
-        r.cardio.forEach(c => { if (lexs[c.idx]) lexs[c.idx] = { ...lexs[c.idx], duration: c.duration, intensity: c.intensity }; });
+        r.cardio.forEach(c => { if (lexs[c.idx]) lexs[c.idx] = { ...lexs[c.idx], duration: c.duration || 0, intensity: c.intensity }; });
         sessions = { ...this.state.sessions, [r.day]: { ...live, exercises: lexs } };
       }
     }
@@ -2553,7 +2553,7 @@ export default class App extends React.Component {
         hasCardio: !!(s.rpeSheet.cardio && s.rpeSheet.cardio.length),
         cardio: (s.rpeSheet.cardio || []).map((c, ci) => ({
           name: c.name, duration: c.duration,
-          onDuration: (e) => { const arr = (this.state.rpeSheet.cardio || []).slice(); arr[ci] = { ...arr[ci], duration: parseInt(e.target.value) || 0 }; this.setState({ rpeSheet: { ...this.state.rpeSheet, cardio: arr } }); },
+          onDuration: (e) => { const arr = (this.state.rpeSheet.cardio || []).slice(); arr[ci] = { ...arr[ci], duration: numOrEmpty(e.target.value) }; this.setState({ rpeSheet: { ...this.state.rpeSheet, cardio: arr } }); },
           intensities: INTENSITIES.map(x => ({ label: x, bg: c.intensity === x ? TYPE_COLOR.Cardio : 'var(--surface-2)', color: c.intensity === x ? '#fff' : 'var(--text)', pick: () => { const arr = (this.state.rpeSheet.cardio || []).slice(); arr[ci] = { ...arr[ci], intensity: x }; this.setState({ rpeSheet: { ...this.state.rpeSheet, cardio: arr } }); } })),
         })),
         submit: () => this.submitRpe(),
@@ -2737,7 +2737,7 @@ export default class App extends React.Component {
         const f = s.cardioAddForm; if (!f) return null;
         return {
           name: f.name, duration: f.duration,
-          onDuration: (e) => this.setState({ cardioAddForm: { ...this.state.cardioAddForm, duration: parseInt(e.target.value) || 0 } }),
+          onDuration: (e) => this.setState({ cardioAddForm: { ...this.state.cardioAddForm, duration: numOrEmpty(e.target.value) } }),
           intensities: INTENSITIES.map(x => ({ label: x, bg: f.intensity === x ? TYPE_COLOR.Cardio : 'var(--surface-2)', color: f.intensity === x ? '#fff' : 'var(--text)', pick: () => this.setState({ cardioAddForm: { ...this.state.cardioAddForm, intensity: x } }) })),
           days: DAYS.map(d => {
             const t = s.program[d].type; const acts = s.program[d].exercises || [];
