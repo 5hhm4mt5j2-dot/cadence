@@ -47,6 +47,9 @@ export default class App extends React.Component {
       programStartDate: new Date().toISOString().slice(0, 10),
       archiveId: null,
       moveOpen: false,
+      moveSrc: null,
+      moveConfirm: null,
+      moveTargetOffset: null,
       exForm: null,
       menuOpen: false,
       exerciseDb: seedExerciseDb(),
@@ -450,6 +453,10 @@ export default class App extends React.Component {
     return patch;
   }
 
+  weekPhrase(offset) {
+    return offset === 0 ? 'This week' : (offset < 0 ? (offset === -1 ? 'Last week' : Math.abs(offset) + ' weeks ago') : (offset === 1 ? 'Next week' : 'In ' + offset + ' weeks'));
+  }
+
   weekLabelFor(offset) {
     const mon = this.weekMonday(offset);
     const sun = new Date(mon.getFullYear(), mon.getMonth(), mon.getDate() + 6);
@@ -565,6 +572,63 @@ export default class App extends React.Component {
       this.save({ weekOverrides: this.writeOverride(offset, day, type, session) });
     }
     this.haptic(true);
+  }
+
+  // Move one day's whole session (any type) to another day — in the same week or a
+  // different calendar week. The target takes the source's type + content; the source
+  // becomes a Rest day. Returns a save-patch spanning whichever weeks were touched
+  // (offset 0 lives in week/sessions; other weeks live in weekOverrides).
+  performMove(from, fromOff, to, toOff) {
+    const s = this.state;
+    const srcView = this.viewWeek(fromOff);
+    const type = srcView.types[from] || 'Rest';
+    const src = srcView.sessions[from];
+    const sess = src ? { ...src, exercises: (src.exercises || []).map(e => ({ ...e })) } : null;
+
+    const week = { ...s.week };
+    const sessions = { ...s.sessions };
+    const overrides = { ...(s.weekOverrides || {}) };
+    let touchedWeek = false; let touchedOv = false;
+    const setDay = (day, off, t, session) => {
+      if (!off) {
+        week[day] = t;
+        if (session) sessions[day] = session; else delete sessions[day];
+        touchedWeek = true;
+      } else {
+        const key = this.weekKey(off);
+        const cur = overrides[key] || {};
+        const entry = { types: { ...(cur.types || {}) }, sessions: { ...(cur.sessions || {}) } };
+        entry.types[day] = t; entry.sessions[day] = session || null;
+        overrides[key] = entry;
+        touchedOv = true;
+      }
+    };
+    // Write the target first, then clear the source — so a same-week move (both writes
+    // land in one override entry) sees the target write when it re-reads the entry.
+    setDay(to, toOff, type, sess);
+    setDay(from, fromOff, 'Rest', null);
+
+    const patch = {};
+    if (touchedWeek) { patch.week = week; patch.sessions = sessions; }
+    if (touchedOv) patch.weekOverrides = overrides;
+    return patch;
+  }
+
+  commitMove(from, fromOff, to, toOff) {
+    const s = this.state;
+    this.haptic(false);
+    const patch = this.performMove(from, fromOff, to, toOff);
+    const reset = { moveOpen: false, moveSrc: null, moveConfirm: null, moveTargetOffset: null };
+    if (s.breakMode) {
+      const log = (s.recoveryLog || []).slice();
+      for (let k = log.length - 1; k >= 0; k--) { if (log[k].choice === 'break' && !log[k].action) { log[k] = { ...log[k], action: 'moved_to_' + to }; break; } }
+      this.save({ ...patch, ...reset, recoveryLog: log, breakMode: false, activeDay: null, screen: 'home' });
+      this.showToast('Workout moved to ' + FULL[to] + '. Rest well.');
+    } else {
+      this.save({ ...patch, ...reset, ...(toOff === 0 ? { activeDay: to } : {}) });
+      const wk = toOff === fromOff ? '' : ' (' + this.weekPhrase(toOff).toLowerCase() + ')';
+      this.showToast(FULL[from] + ' moved to ' + FULL[to] + wk + '.');
+    }
   }
 
   syncProgramExercise(day, index, item) {
@@ -1458,7 +1522,7 @@ export default class App extends React.Component {
         this.save({ recoveryLog: log, recoveryPrompt: null, screen: 'home', activeDay: null });
         this.showToast('Tomorrow is already a rest day. Rest well.');
       } else {
-        this.save({ recoveryLog: log, recoveryPrompt: null, screen: 'week', activeDay: tomKey, breakMode: true, moveOpen: true });
+        this.save({ recoveryLog: log, recoveryPrompt: null, screen: 'week', activeDay: tomKey, breakMode: true, moveSrc: null, moveConfirm: null, moveTargetOffset: null, moveOpen: true });
       }
     } else {
       this.save({ recoveryLog: log, recoveryPrompt: null, screen: 'home', activeDay: null });
@@ -2047,6 +2111,8 @@ export default class App extends React.Component {
           const qk = type === 'Cardio' ? 'cardio' : (isLiftType && hasActivities ? 'lift' : null);
           this.setState({ dayMenu: null, quickAdd: { day, stage: qk ? 'browseCat' : 'type', kind: qk, cat: null, item: null, sets: 3, reps: 10, duration: 30, intensity: 'Moderate', recur: scope, offset: mOff } });
         },        editDay: () => this.setState({ dayMenu: null, screen: 'programDay', activeProgramDay: day }),
+        showMove: src === 'week' && type !== 'Rest',
+        moveToDay: () => this.setState({ dayMenu: null, moveSrc: { day, offset: mOff }, moveConfirm: null, moveTargetOffset: null, moveOpen: true }),
         close: () => this.setState({ dayMenu: null }),
         confirmTitle: dmConfirm ? ('Clear ' + FULL[dmConfirm.day] + '?') : '',
         confirmBody: dmConfirm ? ('This will clear ' + dmConfirm.clearLabel + ' on ' + FULL[dmConfirm.day] + (dmConfirm.scope === 'every' ? ' every week' : ' this week') + '. Continue?') : '',
@@ -2064,32 +2130,35 @@ export default class App extends React.Component {
       };
     }
     const breakMode = !!s.breakMode;
-    const moveTargets = ad ? DAYS.filter(d => d !== ad).map((d, i, arr) => {
-      const occupied = s.week[d] && s.week[d] !== 'Rest';
+    // Move source: explicit moveSrc (any day/week) or the active day this week.
+    const mv = s.moveSrc || (ad ? { day: ad, offset: 0 } : null);
+    const srcOff = mv ? (mv.offset || 0) : 0;
+    // Target week: user can page across calendar weeks (break mode stays in-week).
+    // Range spans the source's own week (so within-week moves still work) through +3.
+    const moveWeekLo = breakMode ? srcOff : Math.max(-3, Math.min(0, srcOff));
+    const moveWeekHi = breakMode ? srcOff : 3;
+    const toOff = mv ? Math.max(moveWeekLo, Math.min(moveWeekHi, s.moveTargetOffset != null ? s.moveTargetOffset : srcOff)) : 0;
+    const toView = mv ? this.viewWeek(toOff) : null;
+    // Exclude the source row only when the target week IS the source week.
+    const moveTargets = mv ? DAYS.filter(d => !(toOff === srcOff && d === mv.day)).map((d, i, arr) => {
+      const tType = (toView.types[d] || 'Rest');
+      const occupied = tType !== 'Rest';
       const disabled = breakMode && occupied;
       return {
         full: FULL[d],
-        current: occupied ? dayTypeName(s.week[d], d, cl, true) : 'Rest',
+        current: occupied ? dayTypeName(tType, d, cl, true) : 'Rest',
         divider: i === arr.length - 1 ? 'transparent' : 'var(--border)',
         rowOpacity: disabled ? 0.4 : 1,
         rowCursor: disabled ? 'not-allowed' : 'pointer',
         pick: () => {
           if (disabled) { this.showToast('That day already has a workout — pick a free day.'); return; }
-          const from = ad, to = d, type = s.week[from], sess = s.sessions[from];
-          const week = { ...s.week }; week[to] = type; week[from] = 'Rest';
-          const sessions = { ...s.sessions }; sessions[to] = sess; delete sessions[from];
-          this.haptic(false);
-          if (breakMode) {
-            let log = (s.recoveryLog || []).slice();
-            for (let k = log.length - 1; k >= 0; k--) { if (log[k].choice === 'break' && !log[k].action) { log[k] = { ...log[k], action: 'moved_to_' + to }; break; } }
-            this.save({ week, sessions, recoveryLog: log, breakMode: false, moveOpen: false, activeDay: null, screen: 'home' });
-            this.showToast('Workout moved to ' + FULL[to] + '. Rest well.');
-          } else {
-            this.save({ week, sessions, activeDay: to, moveOpen: false });
-          }
+          // Overwriting an occupied target: confirm first (break mode disables these rows).
+          if (occupied) { this.setState({ moveConfirm: { from: mv.day, fromOff: srcOff, to: d, toOff } }); return; }
+          this.commitMove(mv.day, srcOff, d, toOff);
         },
       };
     }) : [];
+    const mc = s.moveConfirm;
 
     const menuItems = [
       { label: 'Current Program', iconPath: DUMBBELL, iconColor: TYPE_COLOR.Push, tint: TYPE_TINT.Push, select: () => this.setState({ screen: 'program', menuOpen: false }) },
@@ -2797,7 +2866,7 @@ export default class App extends React.Component {
       todayTrainDisplay: tTrain && !tCompleted ? 'block' : 'none',
       openToday: () => { if (tTrain) this.setState({ screen: 'session', activeDay: tk }); },
       openTodayMenu: () => this.setState({ dayMenu: { day: tk, scope: 'once', source: 'week' }, dayConfirm: null }),
-      openMoveToday: () => { if (tTrain) this.setState({ activeDay: tk, moveOpen: true }); },
+      openMoveToday: () => { if (tTrain) this.setState({ activeDay: tk, moveSrc: null, moveConfirm: null, moveTargetOffset: null, moveOpen: true }); },
 
       sx,
       addExercise: () => {
@@ -2829,7 +2898,7 @@ export default class App extends React.Component {
           this.save({ sessions: { ...this.state.sessions, [ad]: { ...asess, completed: true } }, sessionHistory, sessionPeek: null, rpeSheet: { id: rec.id, day: ad, type: at, rpe: null, notes: '', cardio: cardioActs } });
         },
       } : null,
-      openMoveSession: () => this.setState({ moveOpen: true }),
+      openMoveSession: () => this.setState({ moveSrc: null, moveConfirm: null, moveTargetOffset: null, moveOpen: true }),
 
       programDays,
       pdx,
@@ -2914,11 +2983,27 @@ export default class App extends React.Component {
       },
 
       moveOpen: s.moveOpen,
-      moveType: ad ? s.week[ad] : '',
-      moveTitle: breakMode ? 'Reschedule tomorrow' : ('Move ' + (ad ? s.week[ad] : '') + ' session'),
+      moveType: mv ? (this.viewWeek(srcOff).types[mv.day] || 'Rest') : '',
+      moveTitle: breakMode ? 'Reschedule tomorrow' : ('Move ' + (mv ? FULL[mv.day] : '') + ' session'),
       moveSub: breakMode ? 'Rest day confirmed. Move this workout to a free day within the week.' : 'Shifts this one session only — your recurring schedule stays the same.',
       moveTargets,
-      closeMove: () => this.setState({ moveOpen: false, breakMode: false }),
+      // Cross-week target picker (hidden in break mode, which stays in-week).
+      moveWeekNav: breakMode ? null : {
+        label: this.weekPhrase(toOff),
+        sub: this.weekLabelFor(toOff),
+        prev: () => this.setState({ moveTargetOffset: Math.max(moveWeekLo, toOff - 1) }),
+        next: () => this.setState({ moveTargetOffset: Math.min(moveWeekHi, toOff + 1) }),
+        prevDisabled: toOff <= moveWeekLo,
+        nextDisabled: toOff >= moveWeekHi,
+        prevOpacity: toOff <= moveWeekLo ? '.3' : '1',
+        nextOpacity: toOff >= moveWeekHi ? '.3' : '1',
+      },
+      moveConfirmOpen: !!mc,
+      moveConfirmTitle: mc ? ('Replace ' + FULL[mc.to] + '?') : '',
+      moveConfirmBody: mc ? (FULL[mc.to] + (mc.toOff !== srcOff ? ' (' + this.weekPhrase(mc.toOff).toLowerCase() + ')' : '') + ' already has a ' + dayTypeName(this.viewWeek(mc.toOff).types[mc.to] || 'Rest', mc.to, cl, true) + '. Moving your ' + FULL[mc.from] + ' session here overwrites it.') : '',
+      moveConfirmYes: () => { if (mc) this.commitMove(mc.from, mc.fromOff, mc.to, mc.toOff); },
+      moveConfirmCancel: () => this.setState({ moveConfirm: null }),
+      closeMove: () => this.setState({ moveOpen: false, moveSrc: null, moveConfirm: null, moveTargetOffset: null, breakMode: false }),
     };
   }
 

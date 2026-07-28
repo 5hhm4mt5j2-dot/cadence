@@ -196,16 +196,39 @@ export function MoveLift({ v }) {
       <div data-lt-backdrop onClick={v.closeMove} style={s('position:absolute; inset:0; background:rgba(0,0,0,.42); z-index:42;')}></div>
       <div data-lt-sheet className="scrollable" style={s('position:absolute; left:0; right:0; bottom:0; z-index:43; background:var(--surface); border-radius:26px 26px 0 0; box-shadow:0 -10px 40px rgba(0,0,0,.26); padding:12px 20px 24px;')}>
         <div style={s('width:40px; height:4px; border-radius:999px; background:var(--border); margin:0 auto 16px;')}></div>
-        <div style={s('font-size:17px; font-weight:800; color:var(--text); letter-spacing:-.02em;')}>{v.moveTitle}</div>
-        <div style={s('font-size:12px; color:var(--muted); font-weight:500; margin-top:3px;')}>{v.moveSub}</div>
-        <div style={s('display:flex; flex-direction:column; margin-top:14px;')}>
-          {v.moveTargets.map((mt, i) => (
-            <div key={i} onClick={mt.pick} style={s(`display:flex; align-items:center; justify-content:space-between; padding:13px 4px; border-bottom:1px solid ${mt.divider}; cursor:${mt.rowCursor}; opacity:${mt.rowOpacity};`)}>
-              <span style={s('font-size:14px; font-weight:700; color:var(--text);')}>{mt.full}</span>
-              <span style={s('font-size:11.5px; font-weight:600; color:var(--muted);')}>{mt.current}</span>
+        {v.moveConfirmOpen ? (
+          <div style={s('text-align:center; padding:8px 6px 2px;')}>
+            <div style={s('font-size:19px; font-weight:800; color:var(--text); letter-spacing:-.02em;')}>{v.moveConfirmTitle}</div>
+            <div style={s('font-size:13px; color:var(--muted); font-weight:500; line-height:1.55; margin-top:9px;')}>{v.moveConfirmBody}</div>
+            <div style={s('display:flex; gap:10px; margin-top:22px;')}>
+              <button onClick={v.moveConfirmCancel} style={s('flex:1; border:1px solid var(--border); background:var(--surface); cursor:pointer; font-family:inherit; font-size:13.5px; font-weight:700; color:var(--text); padding:13px 0; border-radius:13px;')}>Cancel</button>
+              <button onClick={v.moveConfirmYes} style={s('flex:1; border:none; cursor:pointer; background:#EF4444; color:#fff; font-family:inherit; font-size:13.5px; font-weight:800; padding:13px 0; border-radius:13px;')}>Replace &amp; move</button>
             </div>
-          ))}
-        </div>
+          </div>
+        ) : (
+          <>
+            <div style={s('font-size:17px; font-weight:800; color:var(--text); letter-spacing:-.02em;')}>{v.moveTitle}</div>
+            <div style={s('font-size:12px; color:var(--muted); font-weight:500; margin-top:3px;')}>{v.moveSub}</div>
+            {v.moveWeekNav && (
+              <div style={s('display:flex; align-items:center; justify-content:space-between; gap:10px; margin-top:14px; background:var(--surface-2); border:1px solid var(--border); border-radius:12px; padding:8px 10px;')}>
+                <button onClick={v.moveWeekNav.prev} disabled={v.moveWeekNav.prevDisabled} style={s(`width:32px; height:32px; flex:none; border:1px solid var(--border); background:var(--surface); border-radius:9px; cursor:pointer; color:var(--text); font-size:16px; line-height:1; opacity:${v.moveWeekNav.prevOpacity};`)}>‹</button>
+                <div style={s('text-align:center; min-width:0;')}>
+                  <div style={s('font-size:13px; font-weight:800; color:var(--text);')}>{v.moveWeekNav.label}</div>
+                  <div style={s('font-size:10.5px; font-weight:600; color:var(--muted); margin-top:1px;')}>{v.moveWeekNav.sub}</div>
+                </div>
+                <button onClick={v.moveWeekNav.next} disabled={v.moveWeekNav.nextDisabled} style={s(`width:32px; height:32px; flex:none; border:1px solid var(--border); background:var(--surface); border-radius:9px; cursor:pointer; color:var(--text); font-size:16px; line-height:1; opacity:${v.moveWeekNav.nextOpacity};`)}>›</button>
+              </div>
+            )}
+            <div style={s('display:flex; flex-direction:column; margin-top:14px;')}>
+              {v.moveTargets.map((mt, i) => (
+                <div key={i} onClick={mt.pick} style={s(`display:flex; align-items:center; justify-content:space-between; padding:13px 4px; border-bottom:1px solid ${mt.divider}; cursor:${mt.rowCursor}; opacity:${mt.rowOpacity};`)}>
+                  <span style={s('font-size:14px; font-weight:700; color:var(--text);')}>{mt.full}</span>
+                  <span style={s('font-size:11.5px; font-weight:600; color:var(--muted);')}>{mt.current}</span>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
       </div>
     </>
   );
