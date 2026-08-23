@@ -68,9 +68,10 @@ export default class App extends React.Component {
       reorderMode: null,
       drag: null,
       sessDrag: null,
+      restMode: false,
       supplements: ['Creatine', 'Omega-3', 'ZMA'],
       supplementsChecked: {},
-      supplementsDate: new Date().toISOString().slice(0, 10),
+      supplementsDate: this.supplementDayKey(),
       supplementsEditOpen: false,
       supplementsDraft: null,
       newSupplementName: '',
@@ -125,8 +126,16 @@ export default class App extends React.Component {
 
   isNightNow() { const h = new Date().getHours(); return h < 6 || h >= 19; }
 
+  // Supplements roll over at 03:00 local (not midnight) so before-bed doses (ZMA etc.)
+  // logged after midnight aren't wiped. Shift "now" back 3h, then take the local date.
+  supplementDayKey() {
+    const shifted = new Date(Date.now() - 3 * 3600 * 1000);
+    const pad = (n) => String(n).padStart(2, '0');
+    return shifted.getFullYear() + '-' + pad(shifted.getMonth() + 1) + '-' + pad(shifted.getDate());
+  }
+
   checkSupplementsReset() {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = this.supplementDayKey();
     if (this.state.supplementsDate !== today) this.save({ supplementsChecked: {}, supplementsDate: today });
   }
 
@@ -150,8 +159,8 @@ export default class App extends React.Component {
       });
     } catch (e) {}
     try { this._mq = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)'); this._mqHandler = () => this.applyAutoTheme(); this._mq && this._mq.addEventListener && this._mq.addEventListener('change', this._mqHandler); } catch (e) {}
-    this._autoTimer = setInterval(() => { this.applyAutoTheme(); this.checkSupplementsReset(); this.maybeRefreshWeather(); }, 5 * 60 * 1000);
-    try { const raw = localStorage.getItem(KEY); if (raw) { const d = JSON.parse(raw); const wk = this.reconcileWeekOverrides(d); this.setState({ recurring: d.recurring || this.state.recurring, week: wk.week || d.week || this.state.week, sessions: wk.sessions || d.sessions || this.state.sessions, weekOverrides: wk.weekOverrides, program: d.program || this.state.program, sessionHistory: d.sessionHistory || this.state.sessionHistory, programStartDate: d.programStartDate || this.state.programStartDate, archive: migrateArchive(d.archive || this.state.archive), supplements: d.supplements || this.state.supplements, supplementsChecked: d.supplementsChecked || this.state.supplementsChecked, supplementsDate: d.supplementsDate || this.state.supplementsDate, exerciseDb: migrateExerciseDb(d.exerciseDb), profile: d.profile || null, meals: d.meals || [], customMeals: d.customMeals || [], tutorialDone: !!d.tutorialDone, recoveryProfile: d.recoveryProfile || { ...DEFAULT_RECOVERY }, recoveryLog: d.recoveryLog || [], cardioDb: migrateCardioDb(d.cardioDb), customLabels: d.customLabels || {}, flowPhase: (d.profile ? (d.tutorialDone ? 'done' : 'tutorial') : 'onboarding'), tutStep: (d.profile && !d.tutorialDone) ? Math.min(TUT_STEPS.length - 1, Math.max(0, parseInt(localStorage.getItem('lt_tut_step') || '0', 10) || 0)) : 0 }, () => { this.checkSupplementsReset(); this._tutMeasureSoon(1100); }); } else { this.setState({ flowPhase: 'splash' }); this.checkSupplementsReset(); } } catch (e) {}
+    this._autoTimer = setInterval(() => { this.applyAutoTheme(); this.checkSupplementsReset(); this.normalizeCompletions(); this.maybeRefreshWeather(); }, 5 * 60 * 1000);
+    try { const raw = localStorage.getItem(KEY); if (raw) { const d = JSON.parse(raw); const wk = this.reconcileWeekOverrides(d); this.setState({ recurring: d.recurring || this.state.recurring, week: wk.week || d.week || this.state.week, sessions: wk.sessions || d.sessions || this.state.sessions, weekOverrides: wk.weekOverrides, program: d.program || this.state.program, sessionHistory: d.sessionHistory || this.state.sessionHistory, programStartDate: d.programStartDate || this.state.programStartDate, archive: migrateArchive(d.archive || this.state.archive), supplements: d.supplements || this.state.supplements, supplementsChecked: d.supplementsChecked || this.state.supplementsChecked, supplementsDate: d.supplementsDate || this.state.supplementsDate, exerciseDb: migrateExerciseDb(d.exerciseDb), profile: d.profile || null, meals: d.meals || [], customMeals: d.customMeals || [], tutorialDone: !!d.tutorialDone, recoveryProfile: d.recoveryProfile || { ...DEFAULT_RECOVERY }, recoveryLog: d.recoveryLog || [], cardioDb: migrateCardioDb(d.cardioDb), customLabels: d.customLabels || {}, restMode: !!d.restMode, flowPhase: (d.profile ? (d.tutorialDone ? 'done' : 'tutorial') : 'onboarding'), tutStep: (d.profile && !d.tutorialDone) ? Math.min(TUT_STEPS.length - 1, Math.max(0, parseInt(localStorage.getItem('lt_tut_step') || '0', 10) || 0)) : 0 }, () => { this.checkSupplementsReset(); this.normalizeCompletions(); this._tutMeasureSoon(1100); }); } else { this.setState({ flowPhase: 'splash' }); this.checkSupplementsReset(); } } catch (e) {}
     this._loadTimer = setTimeout(() => this.setState({ loading: false }), 800);
     this.initWeather();
     this._ptrDetach = window.LT && window.LT.attach({ onRefresh: () => new Promise((r) => setTimeout(r, 600)) });
@@ -184,7 +193,7 @@ export default class App extends React.Component {
 
   save(patch) {
     this.setState(patch, () => {
-      try { localStorage.setItem(KEY, JSON.stringify({ recurring: this.state.recurring, week: this.state.week, sessions: this.state.sessions, weekOverrides: this.state.weekOverrides, program: this.state.program, sessionHistory: this.state.sessionHistory, programStartDate: this.state.programStartDate, archive: this.state.archive, supplements: this.state.supplements, supplementsChecked: this.state.supplementsChecked, supplementsDate: this.state.supplementsDate, exerciseDb: this.state.exerciseDb, cardioDb: this.state.cardioDb, profile: this.state.profile, meals: this.state.meals, customMeals: this.state.customMeals, tutorialDone: this.state.tutorialDone, recoveryProfile: this.state.recoveryProfile, recoveryLog: this.state.recoveryLog, customLabels: this.state.customLabels })); this._saveFailed = false; } catch (e) { if (!this._saveFailed) { this._saveFailed = true; this.showToast("Couldn't save — device storage may be full or blocked (private browsing). Recent changes won't persist."); } }
+      try { localStorage.setItem(KEY, JSON.stringify({ recurring: this.state.recurring, week: this.state.week, sessions: this.state.sessions, weekOverrides: this.state.weekOverrides, program: this.state.program, sessionHistory: this.state.sessionHistory, programStartDate: this.state.programStartDate, archive: this.state.archive, supplements: this.state.supplements, supplementsChecked: this.state.supplementsChecked, supplementsDate: this.state.supplementsDate, exerciseDb: this.state.exerciseDb, cardioDb: this.state.cardioDb, profile: this.state.profile, meals: this.state.meals, customMeals: this.state.customMeals, tutorialDone: this.state.tutorialDone, recoveryProfile: this.state.recoveryProfile, recoveryLog: this.state.recoveryLog, customLabels: this.state.customLabels, restMode: this.state.restMode })); this._saveFailed = false; } catch (e) { if (!this._saveFailed) { this._saveFailed = true; this.showToast("Couldn't save — device storage may be full or blocked (private browsing). Recent changes won't persist."); } }
     });
   }
 
@@ -301,9 +310,9 @@ export default class App extends React.Component {
           archive: migrateArchive(d.archive || this.state.archive), supplements: d.supplements || this.state.supplements,
           supplementsChecked: d.supplementsChecked || {}, supplementsDate: d.supplementsDate || this.state.supplementsDate,
           exerciseDb: migrateExerciseDb(d.exerciseDb), profile: d.profile || null, meals: d.meals || [], customMeals: d.customMeals || [], tutorialDone: !!d.tutorialDone,
-          recoveryProfile: d.recoveryProfile || { ...DEFAULT_RECOVERY }, recoveryLog: d.recoveryLog || [], cardioDb: migrateCardioDb(d.cardioDb), customLabels: d.customLabels || {},
+          recoveryProfile: d.recoveryProfile || { ...DEFAULT_RECOVERY }, recoveryLog: d.recoveryLog || [], cardioDb: migrateCardioDb(d.cardioDb), customLabels: d.customLabels || {}, restMode: !!d.restMode,
           flowPhase: (d.profile ? (d.tutorialDone ? 'done' : 'tutorial') : 'onboarding'), tutStep: (d.profile && !d.tutorialDone) ? Math.min(TUT_STEPS.length - 1, Math.max(0, parseInt(localStorage.getItem('lt_tut_step') || '0', 10) || 0)) : 0, importing: false, confirmImport: false, profileMenu: false, screen: 'week', activeDay: null, loading: false,
-        }, () => { this.checkSupplementsReset(); this._tutMeasureSoon(1100); });
+        }, () => { this.checkSupplementsReset(); this.normalizeCompletions(); this._tutMeasureSoon(1100); });
       } else { this.setState({ importing: false }); }
     } catch (e) { this.setState({ importing: false }); }
     try { const t = localStorage.getItem('lt_theme'), auto = localStorage.getItem('lt_theme_auto'); if (auto === 'false' && t) this.setState({ theme: t, themeAuto: false }); else this.applyAutoTheme(); } catch (e) {}
@@ -423,6 +432,42 @@ export default class App extends React.Component {
     const m = this.weekMonday(offset);
     const pad = (n) => String(n).padStart(2, '0');
     return m.getFullYear() + '-' + pad(m.getMonth() + 1) + '-' + pad(m.getDate());
+  }
+
+  // ISO date for a given weekday within the week at `offset`.
+  weekDayISO(offset, day) {
+    const mon = this.weekMonday(offset);
+    const i = DAYS.indexOf(day);
+    const dt = new Date(mon.getFullYear(), mon.getMonth(), mon.getDate() + i);
+    const pad = (n) => String(n).padStart(2, '0');
+    return dt.getFullYear() + '-' + pad(dt.getMonth() + 1) + '-' + pad(dt.getDate());
+  }
+
+  // Was a session actually LOGGED for this weekday during the current calendar week?
+  // sessions are keyed by weekday and their `completed` flag persists across weeks, so
+  // this (not the flag) is the source of truth for "completed this week".
+  loggedThisWeek(day) {
+    const s = this.state;
+    const monISO = this.weekDayISO(0, DAYS[0]);
+    const sunISO = this.weekDayISO(0, DAYS[6]);
+    const dayISO = this.weekDayISO(0, day);
+    const inWk = (r) => (r.day === day || (!r.day && r.date === dayISO)) && r.date >= monISO && r.date <= sunISO;
+    if ((s.sessionHistory || []).some(inWk)) return true;
+    return (s.archive || []).some(w => (w.sessions || []).some(inWk));
+  }
+
+  // Clear stale `completed` flags left over from a previous week: a weekday reads as
+  // completed only if a workout was logged for it THIS week. Runs on load + periodically
+  // so a day that "passes" without a logged session no longer shows as done.
+  normalizeCompletions() {
+    const sessions = this.state.sessions || {};
+    let changed = false;
+    const next = { ...sessions };
+    DAYS.forEach(d => {
+      const sess = sessions[d];
+      if (sess && sess.completed && !this.loggedThisWeek(d)) { next[d] = { ...sess, completed: false }; changed = true; }
+    });
+    if (changed) this.save({ sessions: next });
   }
 
   // Migrate legacy relative-offset override keys ("1", "-2") to absolute week-start
@@ -1587,11 +1632,14 @@ export default class App extends React.Component {
     const wView = this.viewWeek(wOff);
     const isCurWeek = wOff === 0;
 
+    // Rest mode hides all scheduled work from the week/today view (data is untouched).
+    const restMode = !!s.restMode;
     const days = DAYS.map((d, i) => {
       const t = wView.types[d];
-      const training = t && t !== 'Rest';
+      const realTraining = t && t !== 'Rest';
+      const training = realTraining && !restMode;
       const isToday = isCurWeek && d === s.todayKey;
-      const moved = t !== s.recurring[d];
+      const moved = (t !== s.recurring[d]) && !restMode;
       const sess = wView.sessions[d];
       const openThis = isCurWeek ? openDay(d) : () => { this.haptic(false); this.setState({ dayMenu: { day: d, scope: 'once', source: 'week', offset: wOff }, dayConfirm: null }); };
       return {
@@ -1605,7 +1653,7 @@ export default class App extends React.Component {
         iconColor: training ? TYPE_COLOR[t] : 'var(--muted)',
         iconPath: training ? DUMBBELL : MOON,
         divider: i === DAYS.length - 1 ? 'transparent' : 'var(--border)',
-        rowSub: (training ? dayTypeName(t, d, cl, true) : 'Rest day') + (moved ? ' · this week only' : ''),
+        rowSub: (restMode && realTraining) ? 'No workout due' : ((training ? dayTypeName(t, d, cl, true) : 'Rest day') + (moved ? ' · this week only' : '')),
         rowRight: training && sess ? (sess.completed ? 'Done' : fmt(this.weekVolume({ x: sess }))) : '',
         open: openThis,
         openMenu: () => { this.haptic(false); this.setState({ dayMenu: { day: d, scope: 'once', source: 'week', offset: wOff }, dayConfirm: null }); },
@@ -1632,10 +1680,10 @@ export default class App extends React.Component {
       touchEnd: (e) => { if (this._wsx == null) return; const t = (e.changedTouches ? e.changedTouches[0] : e); const dx = t.clientX - this._wsx; const isMouse = !e.changedTouches; this._wsx = null; if ((!isMouse && !this._wsw) || Math.abs(dx) < 45) return; this.goWeek(dx < 0 ? 1 : -1); },
     };
 
-    // today card
+    // today card (rest mode presents today as a recovery day, workout untouched)
     const tk = s.todayKey;
     const tt = s.week[tk];
-    const tTrain = tt && tt !== 'Rest';
+    const tTrain = tt && tt !== 'Rest' && !restMode;
     const todayBg = tTrain ? TYPE_COLOR[tt] : 'var(--surface)';
     const todayFg = tTrain ? '#fff' : 'var(--text)';
     const tCompleted = !!(tTrain && s.sessions[tk] && s.sessions[tk].completed);
@@ -2166,6 +2214,7 @@ export default class App extends React.Component {
       { label: 'Cardio Database', iconPath: HEART, iconColor: TYPE_COLOR.Cardio, tint: TYPE_TINT.Cardio, select: () => this.setState({ screen: 'cardioDb', activeCardioType: null, menuOpen: false }) },
       { label: 'Meals', iconPath: PLATE, iconColor: TYPE_COLOR.Custom, tint: TYPE_TINT.Custom, select: () => this.setState({ screen: 'meals', menuOpen: false }) },
       { label: 'Archive', iconPath: 'M4 7h16v3H4V7zM5 10v9h14v-9M10 14h4', iconColor: TYPE_COLOR.Legs, tint: TYPE_TINT.Legs, select: () => this.setState({ screen: 'archive', menuOpen: false }) },
+      { label: 'Rest mode', iconPath: MOON, iconColor: s.restMode ? 'var(--accent)' : 'var(--muted)', tint: s.restMode ? 'var(--accent-soft)' : 'var(--surface-2)', trailing: s.restMode ? 'On' : 'Off', trailingBg: s.restMode ? 'var(--accent)' : 'var(--surface-2)', trailingColor: s.restMode ? '#fff' : 'var(--muted)', select: () => { this.haptic(true); this.save({ restMode: !this.state.restMode }); this.showToast(!this.state.restMode ? 'Rest mode on — workouts hidden until you turn it off.' : 'Rest mode off — workouts are back.'); } },
       { label: 'Workout Settings', iconPath: 'M10 2h4M12 9v4l2.5 2.5M12 22a8 8 0 1 0 0-16 8 8 0 0 0 0 16z', iconColor: 'var(--accent)', tint: 'var(--accent-soft)', select: () => this.setState({ menuOpen: false, wsOpen: true }) },
       { label: 'Replay Tutorial', iconPath: 'M4 4v5h5M4 9a8 8 0 1 1-1 5', iconColor: TYPE_COLOR.Custom, tint: TYPE_TINT.Custom, select: () => this.setState({ menuOpen: false, screen: 'week', weekOffset: 0, activeDay: null, flowPhase: 'tutorial', tutStep: 0, tutRect: null }, () => this._tutMeasureSoon(300)) },
     ].map(m => ({ ...m, bg: 'transparent' }));
@@ -2856,10 +2905,10 @@ export default class App extends React.Component {
       days,
       weekNav,
       weekSectionLabel: wOff === 0 ? 'This week' : (wOff < 0 ? (wOff === -1 ? 'Last week' : Math.abs(wOff) + ' weeks ago') : (wOff === 1 ? 'Next week' : 'In ' + wOff + ' weeks')),
-      todayName: FULL[tk], todayProgram: tTrain ? ((tt === 'Custom' && (this.state.customLabels || {})[tk]) || (typeLabel(tt) + ' day')) : 'Rest day',
-      todaySub: tTrain ? (tCompleted ? (tt === 'Cardio' ? 'Session done for today — eat well & get some rest' : 'Lift done for today — eat well & get some rest') : 'Tap below to open and log your session') : 'Recover well — no lift scheduled today',
+      todayName: FULL[tk], todayProgram: tTrain ? ((tt === 'Custom' && (this.state.customLabels || {})[tk]) || (typeLabel(tt) + ' day')) : (restMode ? 'No workout due' : 'Rest day'),
+      todaySub: tTrain ? (tCompleted ? (tt === 'Cardio' ? 'Session done for today — eat well & get some rest' : 'Lift done for today — eat well & get some rest') : 'Tap below to open and log your session') : (restMode ? 'Rest mode is on — turn it off in the Menu to see your workouts' : 'Recover well — no lift scheduled today'),
       todayBg, todayFg,
-      todayStatus: tTrain ? (s.sessions[tk] && s.sessions[tk].completed ? 'Completed' : 'Scheduled') : 'Recovery',
+      todayStatus: tTrain ? (s.sessions[tk] && s.sessions[tk].completed ? 'Completed' : 'Scheduled') : (restMode ? 'Rest mode' : 'Recovery'),
       todayPillBg: tTrain ? 'rgba(255,255,255,.2)' : 'var(--surface-2)',
       todayBtnBg: '#fff', todayBtnFg: tTrain ? TYPE_COLOR[tt] : 'var(--text)',
       todayMoveBorder: 'rgba(255,255,255,.5)',

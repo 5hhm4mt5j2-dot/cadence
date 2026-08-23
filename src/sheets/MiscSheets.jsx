@@ -157,7 +157,10 @@ export function SideMenu({ v }) {
             <span style={s(`width:34px; height:34px; flex:none; border-radius:10px; background:${mi.tint}; display:flex; align-items:center; justify-content:center;`)}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={mi.iconColor} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d={mi.iconPath}></path></svg>
             </span>
-            <span style={s('font-size:14px; font-weight:700; color:var(--text);')}>{mi.label}</span>
+            <span style={s('flex:1; font-size:14px; font-weight:700; color:var(--text);')}>{mi.label}</span>
+            {mi.trailing && (
+              <span style={s(`flex:none; font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:.04em; padding:4px 11px; border-radius:999px; background:${mi.trailingBg}; color:${mi.trailingColor};`)}>{mi.trailing}</span>
+            )}
           </div>
         ))}
       </div>
