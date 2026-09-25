@@ -97,6 +97,18 @@ export default function DayMenu({ v }) {
               </button>
             )}
 
+            {dm.showSkip && (
+              <button onClick={dm.toggleSkip} style={s(`display:flex; align-items:center; gap:13px; text-align:left; width:100%; margin-top:9px; border:${dm.isSkipped ? '1.5px solid var(--muted)' : '1px solid var(--border)'}; background:var(--surface-2); cursor:pointer; font-family:inherit; padding:13px 15px; border-radius:15px; transition:transform .12s cubic-bezier(.34,1.56,.64,1);`)}>
+                <span style={s('width:38px; height:38px; flex:none; border-radius:50%; background:var(--surface); display:flex; align-items:center; justify-content:center; color:var(--muted);')}>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M5 5l8 7-8 7z"></path><path d="M18 5v14"></path></svg>
+                </span>
+                <div style={s('flex:1; min-width:0;')}>
+                  <div style={s('font-size:14px; font-weight:800; color:var(--text);')}>{dm.skipLabel}</div>
+                  <div style={s('font-size:11.5px; color:var(--muted); font-weight:500;')}>{dm.skipDesc}</div>
+                </div>
+              </button>
+            )}
+
             <button onClick={dm.close} style={s('width:100%; margin-top:14px; border:none; background:transparent; cursor:pointer; font-family:inherit; font-size:13px; font-weight:700; color:var(--muted); padding:8px 0;')}>Close</button>
           </>
         )}

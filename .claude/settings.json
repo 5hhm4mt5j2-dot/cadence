@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(xcrun simctl get_app_container *)",
+      "Bash(xcrun simctl list *)",
+      "Bash(plutil -p *)",
+      "Bash(npm run lint)",
+      "mcp__Claude_Browser__read_page",
+      "mcp__Claude_Browser__find",
+      "mcp__Claude_Browser__tabs_select",
+      "mcp__Claude_Browser__read_console_messages",
+      "mcp__claude-in-chrome__read_page",
+      "mcp__claude-in-chrome__get_page_text",
+      "mcp__claude-in-chrome__find",
+      "mcp__claude-in-chrome__read_console_messages",
+      "mcp__claude-in-chrome__read_network_requests"
+    ]
+  }
+}

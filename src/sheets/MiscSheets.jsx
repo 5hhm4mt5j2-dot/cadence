@@ -203,9 +203,10 @@ export function MoveLift({ v }) {
           <div style={s('text-align:center; padding:8px 6px 2px;')}>
             <div style={s('font-size:19px; font-weight:800; color:var(--text); letter-spacing:-.02em;')}>{v.moveConfirmTitle}</div>
             <div style={s('font-size:13px; color:var(--muted); font-weight:500; line-height:1.55; margin-top:9px;')}>{v.moveConfirmBody}</div>
-            <div style={s('display:flex; gap:10px; margin-top:22px;')}>
+            <button onClick={v.moveConfirmRelocate} style={s('width:100%; margin-top:20px; border:none; cursor:pointer; background:var(--accent); color:#fff; font-family:inherit; font-size:13.5px; font-weight:800; padding:13px 0; border-radius:13px;')}>{v.moveConfirmRelocateLabel}</button>
+            <div style={s('display:flex; gap:10px; margin-top:10px;')}>
               <button onClick={v.moveConfirmCancel} style={s('flex:1; border:1px solid var(--border); background:var(--surface); cursor:pointer; font-family:inherit; font-size:13.5px; font-weight:700; color:var(--text); padding:13px 0; border-radius:13px;')}>Cancel</button>
-              <button onClick={v.moveConfirmYes} style={s('flex:1; border:none; cursor:pointer; background:#EF4444; color:#fff; font-family:inherit; font-size:13.5px; font-weight:800; padding:13px 0; border-radius:13px;')}>Replace &amp; move</button>
+              <button onClick={v.moveConfirmSkip} style={s('flex:1; border:none; cursor:pointer; background:#EF4444; color:#fff; font-family:inherit; font-size:13.5px; font-weight:800; padding:13px 0; border-radius:13px;')}>Skip</button>
             </div>
           </div>
         ) : (

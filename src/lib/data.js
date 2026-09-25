@@ -15,11 +15,16 @@ const TYPE_ICON = { Push: DUMBBELL, Pull: DUMBBELL, Legs: DUMBBELL, Cardio: HEAR
 const INTENSITIES = ['Easy', 'Moderate', 'Hard'];
 const typeLabel = (t) => t === 'Legs' ? 'Leg' : t;
 // Display label for a day's type. A Custom day shows the user's own name
-// (customLabels[dayKey]) instead of the literal word "Custom". Pass withDay for
-// the "… day" phrasing used in schedule rows ("Push day", "Rest day"); a named
+// (customLabels[dayKey]) instead of the literal word "Custom". A moved session
+// carries its own `label`, which wins over customLabels — the name travels with the
+// workout for that one week without permanently renaming the target day. Pass withDay
+// for the "… day" phrasing used in schedule rows ("Push day", "Rest day"); a named
 // custom day stays just its name ("Arms Day"), never "Arms Day day".
-const dayTypeName = (type, dayKey, customLabels, withDay) => {
-  if (type === 'Custom' && customLabels && customLabels[dayKey]) return customLabels[dayKey];
+const dayTypeName = (type, dayKey, customLabels, withDay, label) => {
+  if (type === 'Custom') {
+    const name = label == null ? (customLabels && customLabels[dayKey]) : label;
+    if (name) return name;
+  }
   if (!withDay) return typeLabel(type);
   return type === 'Rest' ? 'Rest day' : typeLabel(type) + ' day';
 };
