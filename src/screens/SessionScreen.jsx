@@ -1,4 +1,3 @@
-import React from 'react';
 import { s } from '../lib/helpers';
 
 export default function SessionScreen({ v }) {
@@ -17,11 +16,22 @@ export default function SessionScreen({ v }) {
           <span style={s('display:inline-flex; width:56px; height:56px; border-radius:50%; background:var(--accent-soft); align-items:center; justify-content:center; margin-bottom:20px;')}><svg width="25" height="25" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg></span>
           <div style={s('font-size:20px; font-weight:800; color:var(--text); letter-spacing:-.02em; line-height:1.35;')}>{sx.doneTitle}</div>
           <div style={s('font-size:14.5px; font-weight:600; color:var(--muted); margin-top:7px; line-height:1.5;')}>Eat Well &amp; Get Some Rest.</div>
-          <button onClick={v.peekSession} style={s('margin-top:28px; border:none; background:transparent; cursor:pointer; font-family:inherit; font-size:12px; font-weight:700; color:var(--faint);')}>View session details</button>
+          <button onClick={v.editCompletedWorkout} style={s('margin-top:26px; border:1px solid var(--border); background:var(--surface); cursor:pointer; font-family:inherit; font-size:13px; font-weight:700; color:var(--text); padding:11px 22px; border-radius:12px;')}>Edit workout</button>
+          <div><button onClick={v.peekSession} style={s('margin-top:12px; border:none; background:transparent; cursor:pointer; font-family:inherit; font-size:12px; font-weight:700; color:var(--faint);')}>View session details</button></div>
         </div>
       )}
       {v.sessionNormal && (
         <div style={s('padding:12px 16px 28px;')}>
+          {sx.hasSlots && (
+            <div style={s('display:flex; gap:8px; margin-bottom:14px;')}>
+              {sx.slots.map((sl, i) => (
+                <button key={i} onClick={sl.pick} style={s(`flex:1; min-width:0; text-align:left; border:none; cursor:pointer; font-family:inherit; padding:10px 13px; border-radius:13px; background:${sl.bg}; color:${sl.color};`)}>
+                  <div style={s('font-size:9.5px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; opacity:.75;')}>{sl.sub}</div>
+                  <div style={s('font-size:13px; font-weight:800; margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;')}>{sl.label}</div>
+                </button>
+              ))}
+            </div>
+          )}
           <div style={s('display:flex; align-items:center; gap:11px;')}>
             <span style={s(`width:44px; height:44px; flex:none; border-radius:13px; background:${sx.tint}; display:flex; align-items:center; justify-content:center;`)}>
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={sx.color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d={sx.iconPath}></path></svg>
@@ -37,9 +47,15 @@ export default function SessionScreen({ v }) {
           </div>
 
           {/* exercises */}
-          <div style={s('display:flex; align-items:center; justify-content:space-between; margin:20px 4px 10px;')}>
-            <span style={s('font-size:13px; font-weight:800; color:var(--text);')}>{sx.listLabel}</span>
-            <button onClick={v.addExercise} aria-label="Add activity" style={s('width:44px; height:44px; display:inline-flex; align-items:center; justify-content:center; border:none; cursor:pointer; background:var(--accent); color:#fff; border-radius:50%; padding:0; font-size:20px; line-height:1;')}>+</button>
+          {!!sx.completedNote && (
+            <div style={s('margin-top:14px; background:var(--accent-soft); border-radius:12px; padding:10px 13px; font-size:11.5px; font-weight:700; color:var(--accent); line-height:1.4;')}>{sx.completedNote}</div>
+          )}
+          <div style={s('display:flex; align-items:center; justify-content:space-between; gap:8px; margin:20px 4px 10px;')}>
+            <span style={s('font-size:13px; font-weight:800; color:var(--text); flex:1; min-width:0;')}>{sx.listLabel}</span>
+            {sx.showBulkEdit && (
+              <button onClick={v.openBulkEdit} style={s('flex:none; border:1px solid var(--border); background:var(--surface); cursor:pointer; font-family:inherit; font-size:11.5px; font-weight:700; color:var(--primary); padding:7px 13px; border-radius:999px;')}>Edit all</button>
+            )}
+            <button onClick={v.addExercise} aria-label="Add activity" style={s('width:44px; height:44px; flex:none; display:inline-flex; align-items:center; justify-content:center; border:none; cursor:pointer; background:var(--accent); color:#fff; border-radius:50%; padding:0; font-size:20px; line-height:1;')}>+</button>
           </div>
 
           {sx.hasExercises && (
@@ -52,6 +68,9 @@ export default function SessionScreen({ v }) {
                   <div style={s('flex:1; min-width:0;')}>
                     <div style={s('font-size:14px; font-weight:700; color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;')}>{ex.name}</div>
                     <div style={s("font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--muted); font-weight:600; margin-top:3px;")}>{ex.scheme}</div>
+                    {ex.hasNotes && (
+                      <div style={s('font-size:10.5px; font-weight:700; color:var(--accent); margin-top:3px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;')}>{ex.notes}</div>
+                    )}
                   </div>
                   <div style={s('text-align:right; flex:none;')}>
                     <div style={s("font-family:'JetBrains Mono',monospace; font-size:13px; font-weight:700; color:var(--text);")}>{ex.volume}</div>
@@ -83,9 +102,15 @@ export default function SessionScreen({ v }) {
           <div style={s('font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin:18px 4px 8px;')}>Notes</div>
           <textarea value={sx.notes} onChange={v.onNotes} placeholder="How did the session feel?" style={s('width:100%; min-height:64px; resize:none; border:1px solid var(--border); border-radius:14px; padding:12px 14px; background:var(--surface); font-family:inherit; font-size:16px; font-weight:500; color:var(--text); outline:none;')}></textarea>
 
-          {/* start workout */}
+          {/* start / resume workout — Restart sits beside Resume so a half-logged
+              session can be put back to not-started without opening the logger */}
           {sx.showStart && (
-            <button onClick={v.startWorkout} style={s('width:100%; margin-top:16px; border:none; cursor:pointer; background:var(--text); color:var(--surface); font-family:inherit; font-size:14px; font-weight:800; padding:15px 0; border-radius:14px; display:flex; align-items:center; justify-content:center; gap:8px; transition:transform .1s ease;')}><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15l13-7.5-13-7.5z"></path></svg>{sx.startLabel}</button>
+            <div style={s('display:flex; gap:9px; margin-top:16px;')}>
+              <button onClick={v.startWorkout} style={s('flex:1; min-width:0; border:none; cursor:pointer; background:var(--text); color:var(--surface); font-family:inherit; font-size:14px; font-weight:800; padding:15px 0; border-radius:14px; display:flex; align-items:center; justify-content:center; gap:8px; transition:transform .1s ease;')}><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15l13-7.5-13-7.5z"></path></svg>{sx.startLabel}</button>
+              {sx.showRestart && (
+                <button onClick={sx.askRestart} style={s('flex:none; border:1px solid var(--border); cursor:pointer; background:var(--surface); color:var(--muted); font-family:inherit; font-size:13.5px; font-weight:800; padding:15px 16px; border-radius:14px; display:inline-flex; align-items:center; gap:7px;')}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 8h10a5 5 0 0 1 0 10H8"></path><path d="M8 4 4 8l4 4"></path></svg>Restart</button>
+              )}
+            </div>
           )}
 
           {/* actions */}
@@ -93,6 +118,12 @@ export default function SessionScreen({ v }) {
             <button onClick={v.openMoveSession} style={s('flex:1; border:1px solid var(--border); cursor:pointer; background:var(--surface); color:var(--text); font-family:inherit; font-size:13.5px; font-weight:700; padding:13px 0; border-radius:13px;')}>Move lift</button>
             <button onClick={v.toggleComplete} style={s(`flex:1.4; border:none; cursor:pointer; background:${sx.completeBg}; color:${sx.completeFg}; font-family:inherit; font-size:13.5px; font-weight:800; padding:13px 0; border-radius:13px; display:flex; align-items:center; justify-content:center; gap:7px;`)}><span style={s('font-size:15px; line-height:1;')}>{sx.completeIcon}</span>{sx.completeText}</button>
           </div>
+          {sx.showAddWorkout && (
+            <button onClick={v.openAddWorkout} style={s('width:100%; margin-top:10px; border:1.5px dashed var(--border); cursor:pointer; background:transparent; color:var(--primary); font-family:inherit; font-size:13px; font-weight:700; padding:13px 0; border-radius:13px;')}>+ Add another workout</button>
+          )}
+          {sx.showRemoveExtra && (
+            <button onClick={v.removeExtraWorkout} style={s('width:100%; margin-top:10px; border:1px solid var(--border); cursor:pointer; background:var(--surface); color:#B0715E; font-family:inherit; font-size:13px; font-weight:700; padding:13px 0; border-radius:13px;')}>Remove this second workout</button>
+          )}
         </div>
       )}
     </>

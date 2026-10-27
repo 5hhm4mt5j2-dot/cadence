@@ -21,6 +21,19 @@
   </head>
   <body>
     <div id="root"></div>
+    <!-- Portrait-only. The manifest asks for it, but browsers that ignore
+         "orientation" (notably iOS Safari, in-app and standalone) need this: CSS
+         shows it on a landscape touch screen and hides it again on rotate back. -->
+    <div id="lt-rotate" role="alertdialog" aria-live="polite">
+      <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <rect x="7" y="2.5" width="10" height="19" rx="2.6"></rect>
+        <path d="M12 18.4h.01"></path>
+        <path d="M3.4 9.2A9 9 0 0 1 5 6.4"></path>
+        <path d="M20.6 14.8A9 9 0 0 1 19 17.6"></path>
+      </svg>
+      <p class="lt-rotate-title">Please rotate to portrait</p>
+      <p class="lt-rotate-sub">Cadence is built for one hand, held upright.</p>
+    </div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

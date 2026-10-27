@@ -1,4 +1,3 @@
-import React from 'react';
 import { s } from '../lib/helpers';
 
 // Repeated cloud silhouette used by several weather conditions.

@@ -1,4 +1,3 @@
-import React from 'react';
 import { s } from '../lib/helpers';
 
 export default function WorkoutMode({ v }) {
@@ -12,7 +11,15 @@ export default function WorkoutMode({ v }) {
         <div style={s('min-width:0; display:flex; align-items:center; height:36px;')}>
           <div style={s('font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.07em;')}>Workout · {wo.dayLabel}</div>
         </div>
-        <button onClick={wo.exit} aria-label="Exit workout" style={s('width:44px; height:44px; flex:none; border-radius:50%; border:1px solid var(--border); background:var(--surface); cursor:pointer; color:var(--muted); font-size:14px; line-height:1; font-weight:700; font-family:inherit;')}>✕</button>
+        <div style={s('display:flex; align-items:center; gap:7px; flex:none;')}>
+          {wo.canRestart && (
+            <button onClick={wo.askRestart} aria-label="Restart workout" style={s('height:36px; padding:0 13px; border-radius:999px; border:1px solid var(--border); background:var(--surface); cursor:pointer; color:var(--muted); font-size:12px; font-weight:700; font-family:inherit;')}>Restart</button>
+          )}
+          <button onClick={wo.openOverview} aria-label="Workout overview" style={s('width:44px; height:44px; flex:none; border-radius:50%; border:1px solid var(--border); background:var(--surface); cursor:pointer; color:var(--muted); display:inline-flex; align-items:center; justify-content:center; padding:0;')}>
+            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M1.8 12S5.5 5.5 12 5.5 22.2 12 22.2 12 18.5 18.5 12 18.5 1.8 12 1.8 12z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+          </button>
+          <button onClick={wo.exit} aria-label="Exit workout" style={s('width:44px; height:44px; flex:none; border-radius:50%; border:1px solid var(--border); background:var(--surface); cursor:pointer; color:var(--muted); font-size:14px; line-height:1; font-weight:700; font-family:inherit;')}>✕</button>
+        </div>
       </div>
 
       {/* set logger */}
@@ -25,6 +32,12 @@ export default function WorkoutMode({ v }) {
           <div style={s('text-align:center;')}>
             <div style={s('font-size:16px; font-weight:800; color:var(--text);')}>{wo.setLine}</div>
             <div style={s('font-size:12px; font-weight:600; color:var(--muted); margin-top:3px;')}>{wo.targetLine}</div>
+            {!!wo.lastUsedLine && (
+              <div style={s("font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:700; color:var(--accent); margin-top:4px;")}>{wo.lastUsedLine}</div>
+            )}
+            {!!wo.supersetLine && (
+              <div style={s('display:inline-block; margin-top:7px; font-size:11px; font-weight:800; color:var(--accent); background:var(--accent-soft); padding:5px 11px; border-radius:999px;')}>{wo.supersetLine}</div>
+            )}
           </div>
           <div style={s('background:var(--surface); border:1px solid var(--border); border-radius:22px; padding:18px; box-shadow:var(--shadow); display:flex; flex-direction:column; gap:14px;')}>
             <div style={s('display:flex; align-items:center; gap:10px;')}>
@@ -48,6 +61,35 @@ export default function WorkoutMode({ v }) {
           {wo.hasEditable && (
             <button onClick={wo.editLast} style={s('align-self:center; border:none; background:transparent; cursor:pointer; font-family:inherit; font-size:12.5px; font-weight:700; color:var(--muted); padding:2px 8px;')}>Fix last set (set {wo.lastSetN})</button>
           )}
+        </div>
+      )}
+
+      {/* #56 — dropset prompt: log the lighter follow-up against the set just finished */}
+      {wo.phaseDrop && (
+        <div style={s('flex:1; display:flex; flex-direction:column; justify-content:center; gap:16px; padding:0 22px 26px;')}>
+          <div style={s('text-align:center;')}>
+            <div style={s('font-size:11px; font-weight:800; color:var(--accent); text-transform:uppercase; letter-spacing:.08em;')}>Dropset</div>
+            <div style={s('font-size:22px; font-weight:800; color:var(--text); letter-spacing:-.02em; margin-top:5px;')}>{wo.dropExName}</div>
+            <div style={s('font-size:12px; font-weight:600; color:var(--muted); margin-top:4px;')}>{wo.dropSub}</div>
+          </div>
+          <div style={s('background:var(--surface); border:1px solid var(--border); border-radius:22px; padding:18px; box-shadow:var(--shadow); display:flex; flex-direction:column; gap:14px;')}>
+            <div style={s('display:flex; align-items:center; gap:10px;')}>
+              <span style={s('width:44px; flex:none; font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.05em;')}>Reps</span>
+              <button onMouseDown={wo.dropRepsDec} onTouchStart={wo.dropRepsDec} onMouseUp={wo.holdEnd} onMouseLeave={wo.holdEnd} onTouchEnd={wo.holdEnd} onTouchCancel={wo.holdEnd} style={s('width:54px; height:54px; flex:none; border:none; border-radius:16px; background:var(--surface-2); color:var(--text); cursor:pointer; font-size:26px; font-weight:600; font-family:inherit; user-select:none;')}>−</button>
+              <input value={wo.dropReps} onChange={wo.onDropReps} inputMode="decimal" aria-label="Dropset reps" style={s("flex:1; min-width:0; height:54px; border:none; outline:none; border-radius:16px; background:var(--surface-2); text-align:center; font-family:'JetBrains Mono',monospace; font-size:26px; font-weight:700; color:var(--text);")} />
+              <button onMouseDown={wo.dropRepsInc} onTouchStart={wo.dropRepsInc} onMouseUp={wo.holdEnd} onMouseLeave={wo.holdEnd} onTouchEnd={wo.holdEnd} onTouchCancel={wo.holdEnd} style={s('width:54px; height:54px; flex:none; border:none; border-radius:16px; background:var(--surface-2); color:var(--text); cursor:pointer; font-size:26px; font-weight:600; font-family:inherit; user-select:none;')}>+</button>
+            </div>
+            <div style={s('display:flex; align-items:center; gap:10px;')}>
+              <span style={s('width:44px; flex:none; font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.05em;')}>Kg</span>
+              <button onMouseDown={wo.dropWDec} onTouchStart={wo.dropWDec} onMouseUp={wo.holdEnd} onMouseLeave={wo.holdEnd} onTouchEnd={wo.holdEnd} onTouchCancel={wo.holdEnd} style={s('width:54px; height:54px; flex:none; border:none; border-radius:16px; background:var(--surface-2); color:var(--text); cursor:pointer; font-size:26px; font-weight:600; font-family:inherit; user-select:none;')}>−</button>
+              <input value={wo.dropWeight} onChange={wo.onDropWeight} inputMode="decimal" aria-label="Dropset weight in kg" style={s("flex:1; min-width:0; height:54px; border:none; outline:none; border-radius:16px; background:var(--surface-2); text-align:center; font-family:'JetBrains Mono',monospace; font-size:26px; font-weight:700; color:var(--text);")} />
+              <button onMouseDown={wo.dropWInc} onTouchStart={wo.dropWInc} onMouseUp={wo.holdEnd} onMouseLeave={wo.holdEnd} onTouchEnd={wo.holdEnd} onTouchCancel={wo.holdEnd} style={s('width:54px; height:54px; flex:none; border:none; border-radius:16px; background:var(--surface-2); color:var(--text); cursor:pointer; font-size:26px; font-weight:600; font-family:inherit; user-select:none;')}>+</button>
+            </div>
+          </div>
+          <div style={s('display:flex; gap:9px;')}>
+            <button onClick={wo.skipDrop} style={s('flex:1; border:1px solid var(--border); cursor:pointer; background:var(--surface); color:var(--muted); font-family:inherit; font-size:13.5px; font-weight:700; padding:15px 0; border-radius:15px;')}>Skip dropset</button>
+            <button onClick={wo.logDrop} style={s('flex:2; border:none; cursor:pointer; background:var(--accent); color:#fff; font-family:inherit; font-size:14.5px; font-weight:800; padding:15px 0; border-radius:15px;')}>Log dropset</button>
+          </div>
         </div>
       )}
 
@@ -149,6 +191,50 @@ export default function WorkoutMode({ v }) {
             <button onClick={wo.editLast} style={s('align-self:center; border:none; background:transparent; cursor:pointer; font-family:inherit; font-size:12.5px; font-weight:700; color:var(--muted); padding:2px 8px;')}>Fix last set (set {wo.lastSetN})</button>
           )}
           <button onClick={wo.finish} style={s('width:100%; border:none; cursor:pointer; background:var(--text); color:var(--surface); font-family:inherit; font-size:14.5px; font-weight:800; padding:16px 0; border-radius:16px; margin-top:4px;')}>Finish &amp; rate effort</button>
+        </div>
+      )}
+
+      {/* #58 — read-only overview; tapping anywhere returns to the set in progress */}
+      {wo.overviewOpen && (
+        <div onClick={wo.closeOverview} style={s('position:absolute; inset:0; z-index:40; background:rgba(0,0,0,.45); display:flex; flex-direction:column; justify-content:flex-end;')}>
+          <div className="scrollable" style={s('background:var(--surface); border-radius:26px 26px 0 0; box-shadow:0 -10px 40px rgba(0,0,0,.3); padding:12px 20px 24px; max-height:86%; overflow-y:auto; animation:slideUp .26s cubic-bezier(.22,1,.36,1) both;')}>
+            <div style={s('width:40px; height:4px; border-radius:999px; background:var(--border); margin:0 auto 14px;')}></div>
+            <div style={s('font-size:17px; font-weight:800; color:var(--text); letter-spacing:-.02em;')}>{wo.overviewTitle}</div>
+            <div style={s('font-size:12px; font-weight:600; color:var(--muted); margin-top:3px;')}>{wo.overviewSub}</div>
+            <div style={s('display:flex; flex-direction:column; gap:10px; margin-top:14px;')}>
+              {wo.overviewRows.map((r, i) => (
+                <div key={i} style={s(`background:${r.rowBg}; border-radius:14px; padding:12px 14px;`)}>
+                  <div style={s('display:flex; align-items:center; gap:7px;')}>
+                    <span style={s(`font-size:13.5px; font-weight:800; color:${r.nameColor}; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;`)}>{r.name}</span>
+                    {r.current && <span style={s('flex:none; font-size:9.5px; font-weight:800; color:#fff; background:var(--accent); padding:3px 7px; border-radius:999px; text-transform:uppercase; letter-spacing:.05em;')}>Now</span>}
+                  </div>
+                  <div style={s('font-size:11px; font-weight:600; color:var(--muted); margin-top:3px;')}>{r.meta}</div>
+                  {r.sets.length > 0 && (
+                    <div style={s('display:flex; flex-wrap:wrap; gap:6px; margin-top:8px;')}>
+                      {r.sets.map((st, j) => (
+                        <span key={j} style={s(`font-family:'JetBrains Mono',monospace; font-size:10.5px; font-weight:${st.weight}; color:${st.color}; background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:4px 7px;`)}>{st.label} · {st.text}</span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+            <div style={s('text-align:center; font-size:11.5px; font-weight:600; color:var(--faint); margin-top:16px;')}>Tap anywhere to go back to your set</div>
+          </div>
+        </div>
+      )}
+
+      {/* #54 — restart confirmation */}
+      {wo.restartAsk && (
+        <div style={s('position:absolute; inset:0; z-index:45; background:rgba(20,16,12,.55); display:flex; align-items:center; justify-content:center; padding:0 28px;')}>
+          <div style={s('background:var(--surface); border:1px solid var(--border); border-radius:20px; padding:22px; max-width:300px; box-shadow:0 16px 44px rgba(0,0,0,.34); animation:zenIn .3s cubic-bezier(.22,1,.36,1) both;')}>
+            <div style={s('font-size:17px; font-weight:800; color:var(--text); letter-spacing:-.02em;')}>Restart today's workout?</div>
+            <div style={s('font-size:13px; font-weight:500; color:var(--muted); margin-top:8px; line-height:1.5;')}>All logged sets will be cleared. Your exercises stay exactly as they are.</div>
+            <div style={s('display:flex; gap:8px; margin-top:18px;')}>
+              <button onClick={wo.cancelRestart} style={s('flex:1; border:1px solid var(--border); cursor:pointer; background:var(--surface); color:var(--muted); font-family:inherit; font-size:13px; font-weight:700; padding:11px 0; border-radius:11px;')}>Cancel</button>
+              <button onClick={wo.confirmRestart} style={s('flex:1; border:none; cursor:pointer; background:#EF4444; color:#fff; font-family:inherit; font-size:13px; font-weight:800; padding:11px 0; border-radius:11px;')}>Restart</button>
+            </div>
+          </div>
         </div>
       )}
     </div>

@@ -1,10 +1,16 @@
-import React from 'react';
 import { s } from '../lib/helpers';
 
 export default function ProgramScreen({ v }) {
   return (
     <div style={s('padding:14px 16px 28px;')}>
       <div style={s('font-size:12.5px; color:var(--muted); font-weight:500; line-height:1.5; margin-bottom:14px;')}>Your recurring weekly split. Edits here repeat every week.</div>
+      <div style={s('display:flex; align-items:center; justify-content:space-between; gap:10px; background:var(--surface); border:1px solid var(--border); border-radius:18px; padding:14px 16px; box-shadow:var(--shadow); margin-bottom:12px;')}>
+        <div style={s('min-width:0;')}>
+          <div style={s('font-size:10.5px; font-weight:700; color:var(--faint); text-transform:uppercase; letter-spacing:.06em;')}>Program</div>
+          <div style={s('font-size:15px; font-weight:800; color:var(--text); letter-spacing:-.01em; margin-top:3px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;')}>{v.programName}</div>
+        </div>
+        <button onClick={v.openProgramRename} style={s('flex:none; border:1px solid var(--border); background:var(--surface); cursor:pointer; font-family:inherit; font-size:11.5px; font-weight:700; color:var(--primary); padding:6px 13px; border-radius:999px;')}>Rename</button>
+      </div>
       <div style={s('background:var(--surface); border:1px solid var(--border); border-radius:20px; padding:4px 16px; box-shadow:var(--shadow);')}>
         {v.programDays.map((pd) => (
           <div key={pd.key} onClick={pd.tap} style={s(`display:flex; align-items:center; gap:13px; padding:13px 0; border-bottom:1px solid ${pd.divider}; cursor:pointer; transition:transform .12s cubic-bezier(.34,1.56,.64,1);`)}>
@@ -21,6 +27,7 @@ export default function ProgramScreen({ v }) {
         ))}
       </div>
       <button onClick={v.openHistory} style={s('width:100%; margin-top:16px; border:1px solid var(--border); background:var(--surface); cursor:pointer; font-family:inherit; font-size:13.5px; font-weight:700; color:var(--text); padding:13px 0; border-radius:13px;')}>Session History</button>
+      <button onClick={v.exportCurrentProgramPdf} style={s('width:100%; margin-top:10px; border:1px solid var(--border); background:var(--surface); cursor:pointer; font-family:inherit; font-size:13.5px; font-weight:700; color:var(--text); padding:13px 0; border-radius:13px;')}>Export PDF</button>
       <button onClick={v.sendToArchive} style={s('width:100%; margin-top:10px; border:none; cursor:pointer; background:var(--accent); color:#fff; font-family:inherit; font-size:13.5px; font-weight:800; padding:13px 0; border-radius:13px;')}>Send to Archive</button>
     </div>
   );

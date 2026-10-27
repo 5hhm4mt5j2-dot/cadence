@@ -1,4 +1,3 @@
-import React from 'react';
 import { s } from '../lib/helpers';
 
 export function CardioDbScreen({ v }) {

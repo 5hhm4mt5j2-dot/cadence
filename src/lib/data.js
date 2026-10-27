@@ -139,8 +139,23 @@ function migrateCardioDb(saved) {
 const fmt = (n) => Math.round(n).toLocaleString() + ' kg';
 const fmtDate = (iso) => { try { return new Date(iso + 'T00:00:00').toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' }); } catch (e) { return iso; } };
 const MONTH_ABBR = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+// A program snapshot ("what was in it") derived from the sessions logged under it —
+// used for legacy archive entries saved before the snapshot was stored on archiving.
+function archiveDaysFrom(sessions) {
+  const byDay = {};
+  (sessions || []).forEach(se => {
+    const strip = (se.exercises || []).map(e => (e.cardio
+      ? { name: e.name, cardio: true, duration: e.duration, intensity: e.intensity }
+      : { name: e.name, sets: e.sets, reps: e.reps, weight: e.weight }));
+    const cur = byDay[se.day];
+    if (!cur || (se.date || '') >= cur.date) byDay[se.day] = { day: se.day, type: se.type, label: se.label || '', date: se.date || '', exercises: strip };
+  });
+  return DAYS.map(d => byDay[d]).filter(Boolean);
+}
+
 function migrateArchive(arr) {
-  return (arr || []).map(w => {
+  const total = (arr || []).length;
+  return (arr || []).map((w, i) => {
     let sessions = w.sessions || [];
     let dates = sessions.map(se => se.date).filter(Boolean).sort();
     if (!dates.length) {
@@ -159,11 +174,51 @@ function migrateArchive(arr) {
         }
       }
     }
-    if (dates.length) return { ...w, sessions, label: 'From ' + fmtDate(dates[0]) + ' to ' + fmtDate(dates[dates.length - 1]) };
-    return { ...w, sessions };
+    // Program metadata: stored on archiving since the Archive became program-centric,
+    // derived here for entries written before that.
+    const startDate = w.startDate || (dates.length ? dates[0] : '');
+    const endDate = w.endDate || (dates.length ? dates[dates.length - 1] : '');
+    const name = w.name || ('Program ' + (total - i));
+    const days = (w.days && w.days.length) ? w.days : archiveDaysFrom(sessions);
+    const label = (startDate && endDate) ? ('From ' + fmtDate(startDate) + ' to ' + fmtDate(endDate)) : (w.label || '');
+    return { ...w, sessions, name, startDate, endDate, days, label };
   });
 }
-const exVol = (e) => { if (e.cardio) return 0; const lg = e.logged || []; const sets = e.sets || 0; const t = (e.reps || 0) * (e.weight || 0); let v = 0; for (let i = 0; i < sets; i++) { const l = lg[i]; v += l ? (l.skipped ? 0 : (l.reps || 0) * (l.weight || 0)) : t; } return v; };
+
+// Monday (ISO) of the week a date falls in — the key weekly grouping uses.
+const weekStartISO = (iso) => {
+  const d = new Date(iso + 'T00:00:00');
+  d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+  return d.toISOString().slice(0, 10);
+};
+// Inclusive day span between two ISO dates.
+const daySpan = (a, b) => Math.max(1, Math.round((new Date(b + 'T00:00:00') - new Date(a + 'T00:00:00')) / 86400000) + 1);
+const fmtDateShort = (iso) => { try { return new Date(iso + 'T00:00:00').toLocaleDateString('en-US', { day: 'numeric', month: 'short' }); } catch (e) { return iso; } };
+// Energy equivalent of a kilo of body mass — used for TDEE recalibration.
+const KCAL_PER_KG = 7700;
+// Top working weight an exercise record represents (logged if it was logged, else planned).
+const topWeight = (e) => {
+  const lg = (e.logged || []).filter(l => !l.skipped);
+  if (lg.length) return lg.reduce((a, l) => Math.max(a, l.weight || 0), 0);
+  return e.weight || 0;
+};
+// "62×8, 62×8, 60×7" for a logged exercise; the planned scheme when nothing was logged.
+const loggedLine = (e) => {
+  if (e.cardio) return (e.duration || 0) + ' min · ' + (e.intensity || 'Moderate');
+  const lg = (e.logged || []).filter(l => !l.skipped);
+  if (!lg.length) return (e.sets || 0) + ' × ' + (e.reps || 0) + ' × ' + (e.weight || 0) + 'kg';
+  return lg.map(l => (l.weight || 0) + 'kg × ' + (l.reps || 0) + (l.drop ? ' ▾' + (l.drop.weight || 0) + '×' + (l.drop.reps || 0) : '')).join(', ');
+};
+// "Superset with Barbell Row · dropset 80%" — the pairing notes shown under an exercise.
+const exerciseNotes = (e) => {
+  const parts = [];
+  if (e.supersetWith) parts.push('Superset with ' + e.supersetWith);
+  if (e.dropset && e.dropset.pct) parts.push('Dropset at ' + e.dropset.pct + '%');
+  return parts.join(' · ');
+};
+// Volume counts the working set plus any dropset logged straight after it (#56).
+const setVol = (l) => (l.skipped ? 0 : ((l.reps || 0) * (l.weight || 0)) + (l.drop ? (l.drop.reps || 0) * (l.drop.weight || 0) : 0));
+const exVol = (e) => { if (e.cardio) return 0; const lg = e.logged || []; const sets = e.sets || 0; const t = (e.reps || 0) * (e.weight || 0); let v = 0; for (let i = 0; i < Math.max(sets, lg.length); i++) { const l = lg[i]; v += l ? setVol(l) : (i < sets ? t : 0); } return v; };
 // Numeric-input value: keep the field empty when cleared (so typing a fresh
 // digit replaces cleanly) instead of snapping back to a leading 0.
 const numOrEmpty = (raw, float) => { if (raw === '' || raw == null) return ''; const n = float ? parseFloat(raw) : parseInt(raw, 10); return Number.isNaN(n) ? '' : n; };
@@ -399,7 +454,8 @@ export {
   DAYS, FULL, TYPES, TYPE_COLOR, TYPE_TINT, DUMBBELL, SNEAKER, HEART, MOON, TYPE_ICON,
   INTENSITIES, typeLabel, dayTypeName, TUT_STEPS, ONB_DEFAULTS, DEFAULT_EX, CARDIO_TYPES, seedCardioDb,
   PACES,
-  migrateCardioDb, fmt, fmtDate, MONTH_ABBR, migrateArchive, exVol, W_DEFAULTS, scheme,
+  migrateCardioDb, fmt, fmtDate, fmtDateShort, MONTH_ABBR, migrateArchive, exVol, W_DEFAULTS, scheme,
+  weekStartISO, daySpan, KCAL_PER_KG, topWeight, loggedLine, exerciseNotes,
   seedSessions, seedExerciseDb, migrateExerciseDb, eqToOptions, eqLabel, KEY, BODY_PARTS,
   PLATE, MACRO_COLORS, ACTIVITY, ACTIVITY_MULT, GOALS, GOAL_RULES, DEFAULT_RECOVERY,
   RPE_SCALE, FOOD_DB, fmtKcal, mealMacroLine, GPU, itemMacros, sumItems, timeLabel,

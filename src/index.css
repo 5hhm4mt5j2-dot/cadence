@@ -96,8 +96,52 @@ select,
   user-select: text;
 }
 
+/* ===== Portrait lock =====
+   manifest.webmanifest asks for "orientation": "portrait", which installed
+   Android PWAs honour; iOS (and plain mobile browsers) ignore it, so this is the
+   fallback. #lt-rotate is in index.html and hidden by default; it only takes over
+   on a landscape TOUCH screen that is too short to be a laptop — (hover: none)
+   and (pointer: coarse) keep the desktop phone-mockup untouched, and the
+   max-height ceiling keeps a short desktop window out of it too. */
+#lt-rotate { display: none; }
+/* The overlay sits outside [data-theme], so it can't inherit the app's own (possibly
+   manual) theme — it follows the system scheme, like the html background above. */
+@media (prefers-color-scheme: dark) {
+  #lt-rotate { --bg: #211F1C; --surface: #2A2825; --text: #F0EBE2; --muted: #A8A095; }
+}
+@media (orientation: landscape) and (max-height: 560px) and (hover: none) and (pointer: coarse) {
+  #lt-rotate {
+    display: flex;
+    position: fixed;
+    inset: 0;
+    z-index: 2147483647;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    padding: 24px;
+    text-align: center;
+    background: var(--bg, #F4F1EC);
+    color: var(--muted, #8A8276);
+    font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+  }
+  #lt-rotate svg { margin-bottom: 14px; }
+  .lt-rotate-title { margin: 0; font-size: 17px; font-weight: 800; letter-spacing: -.02em; color: var(--text, #2C2926); }
+  .lt-rotate-sub { margin: 6px 0 0; font-size: 13px; font-weight: 600; }
+  /* The app keeps running behind it (timers, wake lock) but must not be reachable. */
+  .app-canvas { pointer-events: none; }
+}
+
 @media print {
+  @page { margin: 12mm; }
+  html, body { background: #fff !important; }
   body * { visibility: hidden; }
+  /* The phone frame is only hidden, so it still took its 390px of the flex row and
+     squeezed the report into whatever was left — a sliver of wrapped text. Drop it out
+     of layout and let the canvas be a plain block so the report gets the whole page. */
+  .app-canvas { display: block !important; padding: 0 !important; min-height: 0 !important; background: #fff !important; }
+  [data-lt-phone] { display: none !important; }
   #lt-print-area, #lt-print-area * { visibility: visible; }
   #lt-print-area { position: static !important; width: auto !important; height: auto !important; overflow: visible !important; left: auto !important; }
+  [data-print-block] { break-inside: avoid; page-break-inside: avoid; }
 }

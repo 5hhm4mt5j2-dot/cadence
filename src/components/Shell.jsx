@@ -1,4 +1,3 @@
-import React from 'react';
 import { s } from '../lib/helpers';
 import Hero from './Hero';
 import TopBar from './TopBar';
@@ -19,7 +18,7 @@ import QuickAdd from '../sheets/QuickAdd';
 import DayMenu from '../sheets/DayMenu';
 import { MealAddSheet, MealDetailSheet, SavedMealDetailSheet, NutritionExportSheet } from '../sheets/MealSheets';
 import { WorkoutSettingsSheet, RpeSheet, RecoveryPrompt, RecoveryView } from '../sheets/RecoverySheets';
-import { ImportConfirm, ImportLoading, Toast, TagRename, CompleteConfirm, ProfileEditSheet, SideMenu, MoveLift, SupplementsEdit } from '../sheets/MiscSheets';
+import { ImportConfirm, ImportLoading, Toast, TagRename, CompleteConfirm, ProfileEditSheet, SideMenu, MoveLift, SupplementsEdit, WeightLog, ProgramRename, AddWorkout, BulkEdit, UndoButton, RestartConfirm } from '../sheets/MiscSheets';
 
 import { Splash, Welcome, Tutorial, FirstLaunch, Onboarding } from '../overlays/Flows';
 import WorkoutMode from '../overlays/WorkoutMode';
@@ -62,6 +61,8 @@ export default function Shell({ v }) {
           {v.onArchiveDetail && <ArchiveDetailScreen v={v} />}
         </div>
 
+        {v.undoVisible && <UndoButton v={v} />}
+
         {/* ===== overlays & sheets ===== */}
         {v.exSheetOpen && <ExerciseSheet v={v} />}
         {v.dbFormOpen && <DbFormSheet v={v} />}
@@ -76,6 +77,7 @@ export default function Shell({ v }) {
         {v.exportOpen && <NutritionExportSheet v={v} />}
         {v.tagRenameOpen && <TagRename v={v} />}
         {v.ccOpen && <CompleteConfirm v={v} />}
+        {v.restartConfirmOpen && <RestartConfirm v={v} />}
         {v.woActive && <WorkoutMode v={v} />}
         {v.wsOpenFlag && <WorkoutSettingsSheet v={v} />}
         {v.rpeOpen && <RpeSheet v={v} />}
@@ -84,6 +86,10 @@ export default function Shell({ v }) {
         {v.profileEditOpen && <ProfileEditSheet v={v} />}
         {v.menuOpen && <SideMenu v={v} />}
         {v.moveOpen && <MoveLift v={v} />}
+        {v.weightFormOpen && <WeightLog v={v} />}
+        {v.addWorkoutOpen && <AddWorkout v={v} />}
+        {v.bulkOpen && <BulkEdit v={v} />}
+        {v.programRenameOpen && <ProgramRename v={v} />}
 
         {/* flows */}
         {v.splashActive && <Splash v={v} />}

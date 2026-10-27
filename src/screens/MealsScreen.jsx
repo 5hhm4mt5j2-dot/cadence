@@ -1,4 +1,3 @@
-import React from 'react';
 import { s } from '../lib/helpers';
 
 export default function MealsScreen({ v }) {
@@ -79,6 +78,42 @@ export default function MealsScreen({ v }) {
               <span style={s('font-size:12px; font-weight:700; color:var(--muted);')}>Calories remaining</span>
               <span style={s(`font-family:'JetBrains Mono',monospace; font-size:20px; font-weight:700; color:${mx.remainColor}; letter-spacing:-.02em;`)}>{mx.remaining}</span>
             </div>
+          </div>
+          <div style={s('display:flex; align-items:center; justify-content:space-between; margin:20px 4px 10px;')}>
+            <span style={s('font-size:15px; font-weight:800; color:var(--text); letter-spacing:-.01em;')}>Weight trend</span>
+            <span style={s('font-size:11px; font-weight:700; color:var(--muted);')}>{v.wchart.has ? v.wchart.current : ''}</span>
+          </div>
+          <div style={s('background:var(--surface); border:1px solid var(--border); border-radius:20px; padding:16px; box-shadow:var(--shadow);')}>
+            {v.wchart.has && (
+              <>
+                <div style={s('position:relative;')}>
+                  <svg viewBox="0 0 320 120" style={s('width:100%; height:auto; display:block; overflow:visible;')}>
+                    {v.wchart.showExpected && (
+                      <polyline points={v.wchart.expLine} fill="none" stroke="var(--muted)" strokeWidth="1.6" strokeDasharray="5 4" strokeLinecap="round" opacity=".55"></polyline>
+                    )}
+                    <polyline points={v.wchart.line} fill="none" stroke="var(--accent)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"></polyline>
+                    {v.wchart.dots.map((d, i) => (
+                      <circle key={i} cx={d.cx} cy={d.cy} r="2.6" fill="var(--accent)"></circle>
+                    ))}
+                  </svg>
+                  <span style={s("position:absolute; top:0; right:0; font-family:'JetBrains Mono',monospace; font-size:9.5px; font-weight:600; color:var(--faint); background:var(--surface); padding:0 3px; border-radius:4px;")}>{v.wchart.hiLabel}</span>
+                  <span style={s("position:absolute; bottom:0; right:0; font-family:'JetBrains Mono',monospace; font-size:9.5px; font-weight:600; color:var(--faint); background:var(--surface); padding:0 3px; border-radius:4px;")}>{v.wchart.loLabel}</span>
+                </div>
+                <div style={s('display:flex; justify-content:space-between; margin-top:6px; font-size:10px; font-weight:600; color:var(--faint);')}>
+                  <span>{v.wchart.fromLabel}</span><span>{v.wchart.toLabel}</span>
+                </div>
+                <div style={s('margin-top:12px; padding-top:12px; border-top:1px solid var(--border);')}>
+                  <div style={s("font-family:'JetBrains Mono',monospace; font-size:11.5px; font-weight:700; color:var(--text);")}>{v.wchart.rateLine}</div>
+                  <div style={s('font-size:11.5px; font-weight:600; color:var(--muted); margin-top:4px; line-height:1.5;')}>{v.wchart.checkLine}</div>
+                  {!!v.wchart.lastAdjust && (
+                    <div style={s('font-size:11px; font-weight:600; color:var(--faint); margin-top:3px;')}>{v.wchart.lastAdjust}</div>
+                  )}
+                </div>
+              </>
+            )}
+            {v.wchart.empty && (
+              <div style={s('font-size:12.5px; color:var(--muted); font-weight:500; text-align:center; padding:6px 0; line-height:1.5;')}>{v.wchart.emptyText}</div>
+            )}
           </div>
           <button onClick={v.openMealAdd} style={s('width:100%; margin-top:14px; border:none; cursor:pointer; background:var(--accent); color:#fff; font-family:inherit; font-size:13.5px; font-weight:800; padding:13px 0; border-radius:13px;')}>+ Add Meal</button>
           <div style={s('margin:20px 4px 10px;')}><span style={s('font-size:15px; font-weight:800; color:var(--text); letter-spacing:-.01em;')}>Meals today</span></div>

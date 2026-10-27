@@ -1,4 +1,3 @@
-import React from 'react';
 import { s } from '../lib/helpers';
 
 export default function ProgramDayScreen({ v }) {
@@ -36,6 +35,9 @@ export default function ProgramDayScreen({ v }) {
                     <div style={s('flex:1; min-width:0;')}>
                       <div style={s('font-size:14px; font-weight:700; color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;')}>{ex.name}</div>
                       <div style={s("font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--muted); font-weight:600; margin-top:3px;")}>{ex.scheme}</div>
+                      {ex.hasNotes && (
+                        <div style={s('font-size:10.5px; font-weight:700; color:var(--accent); margin-top:3px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;')}>{ex.notes}</div>
+                      )}
                     </div>
                   </div>
                 </div>

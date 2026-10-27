@@ -1,4 +1,3 @@
-import React from 'react';
 import { s } from '../lib/helpers';
 
 export default function WeekScreen({ v }) {
@@ -46,6 +45,24 @@ export default function WeekScreen({ v }) {
         <div style={s('display:flex; gap:8px; margin-top:12px;')}>
           <button onClick={v.openToday} style={s(`flex:1; border:none; cursor:pointer; background:${v.todayBtnBg}; color:${v.todayBtnFg}; font-family:inherit; font-size:12.5px; font-weight:700; padding:9px 0; border-radius:11px; display:${v.todayTrainDisplay};`)}>Open session</button>
           <button onClick={v.openMoveToday} style={s(`flex:1; border:1px solid ${v.todayMoveBorder}; cursor:pointer; background:transparent; color:${v.todayFg}; font-family:inherit; font-size:12.5px; font-weight:700; padding:9px 0; border-radius:11px; display:${v.todayTrainDisplay};`)}>Move lift</button>
+        </div>
+      </div>
+
+      {/* body weight */}
+      <div style={s('display:flex; align-items:center; justify-content:space-between; margin:16px 4px 10px;')}>
+        <span style={s('font-size:15px; font-weight:800; color:var(--text); letter-spacing:-.01em;')}>Weight</span>
+        <button onClick={v.bw.open} style={s('border:1px solid var(--border); background:var(--surface); cursor:pointer; font-family:inherit; font-size:11.5px; font-weight:700; color:var(--primary); padding:6px 13px; border-radius:999px;')}>{v.bw.ctaLabel}</button>
+      </div>
+      <div onClick={v.bw.open} style={s('background:var(--surface); border:1px solid var(--border); border-radius:20px; padding:15px 16px; box-shadow:var(--shadow); cursor:pointer;')}>
+        <div style={s('display:flex; align-items:flex-end; justify-content:space-between; gap:12px;')}>
+          <div style={s('min-width:0;')}>
+            <div style={s('font-size:10.5px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.06em;')}>{v.bw.dateLabel}</div>
+            <div style={s('display:flex; align-items:baseline; gap:5px; margin-top:4px;')}>
+              <span style={s("font-family:'JetBrains Mono',monospace; font-size:24px; font-weight:700; color:var(--text); letter-spacing:-.02em;")}>{v.bw.value}</span>
+              <span style={s('font-size:12px; font-weight:700; color:var(--muted);')}>kg</span>
+            </div>
+          </div>
+          <span style={s(`font-size:11.5px; font-weight:700; color:${v.bw.trendColor}; text-align:right; max-width:54%;`)}>{v.bw.trend}</span>
         </div>
       </div>
 

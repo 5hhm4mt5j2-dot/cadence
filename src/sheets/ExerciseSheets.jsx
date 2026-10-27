@@ -1,4 +1,3 @@
-import React from 'react';
 import { s } from '../lib/helpers';
 
 export function ExerciseSheet({ v }) {
@@ -33,6 +32,41 @@ export function ExerciseSheet({ v }) {
               <span style={s('font-size:12px; font-weight:700; color:var(--muted);')}>Exercise volume</span>
               <span style={s("font-family:'JetBrains Mono',monospace; font-size:15px; font-weight:700; color:var(--accent);")}>{ef.volume}</span>
             </div>
+            {/* #56 — pair this exercise with another, or chase each set with a dropset */}
+            <div style={s('font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin:18px 0 8px;')}>Configure</div>
+            <button onClick={ef.toggleSuperset} style={s('width:100%; display:flex; align-items:center; gap:11px; text-align:left; border:1px solid var(--border); background:var(--surface-2); cursor:pointer; font-family:inherit; padding:12px 13px; border-radius:12px;')}>
+              <span style={s(`width:20px; height:20px; flex:none; border-radius:6px; border:2px solid ${ef.supersetOn ? 'var(--accent)' : 'var(--border)'}; background:${ef.supersetOn ? 'var(--accent)' : 'transparent'}; display:flex; align-items:center; justify-content:center; color:#fff; font-size:12px; font-weight:800;`)}>{ef.supersetOn ? '✓' : ''}</span>
+              <span style={s('flex:1; min-width:0;')}>
+                <span style={s('display:block; font-size:13px; font-weight:700; color:var(--text);')}>Superset with another exercise</span>
+                <span style={s('display:block; font-size:11px; font-weight:500; color:var(--muted); margin-top:1px;')}>Both performed back-to-back, no rest between them</span>
+              </span>
+            </button>
+            {ef.supersetOn && ef.hasSupersetChoices && (
+              <div style={s('display:flex; flex-wrap:wrap; gap:7px; margin-top:9px;')}>
+                {ef.supersetChoices.map((c, i) => (
+                  <button key={i} onClick={c.pick} style={s(`border:none; cursor:pointer; font-family:inherit; font-size:12px; font-weight:700; padding:9px 13px; border-radius:999px; background:${c.bg}; color:${c.color};`)}>{c.label}</button>
+                ))}
+              </div>
+            )}
+            <button onClick={ef.toggleDropset} style={s('width:100%; margin-top:9px; display:flex; align-items:center; gap:11px; text-align:left; border:1px solid var(--border); background:var(--surface-2); cursor:pointer; font-family:inherit; padding:12px 13px; border-radius:12px;')}>
+              <span style={s(`width:20px; height:20px; flex:none; border-radius:6px; border:2px solid ${ef.dropsetOn ? 'var(--accent)' : 'var(--border)'}; background:${ef.dropsetOn ? 'var(--accent)' : 'transparent'}; display:flex; align-items:center; justify-content:center; color:#fff; font-size:12px; font-weight:800;`)}>{ef.dropsetOn ? '✓' : ''}</span>
+              <span style={s('flex:1; min-width:0;')}>
+                <span style={s('display:block; font-size:13px; font-weight:700; color:var(--text);')}>Dropset</span>
+                <span style={s('display:block; font-size:11px; font-weight:500; color:var(--muted); margin-top:1px;')}>Lighter follow-up straight after each working set</span>
+              </span>
+            </button>
+            {ef.dropsetOn && (
+              <>
+                <div style={s('display:flex; gap:7px; margin-top:9px;')}>
+                  {ef.dropPcts.map((d, i) => (
+                    <button key={i} onClick={d.pick} style={s(`flex:1; border:none; cursor:pointer; font-family:inherit; font-size:12px; font-weight:700; padding:9px 0; border-radius:10px; background:${d.bg}; color:${d.color};`)}>{d.label}</button>
+                  ))}
+                </div>
+                {!!ef.dropPreview && (
+                  <div style={s('font-size:11.5px; font-weight:600; color:var(--muted); margin-top:7px;')}>{ef.dropPreview}</div>
+                )}
+              </>
+            )}
           </>
         )}
         {ef.isCardio && (
