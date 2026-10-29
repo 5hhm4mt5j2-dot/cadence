@@ -3,6 +3,15 @@
 
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const FULL = { Mon: 'Monday', Tue: 'Tuesday', Wed: 'Wednesday', Thu: 'Thursday', Fri: 'Friday', Sat: 'Saturday', Sun: 'Sunday' };
+// A Date's calendar day in LOCAL time, as YYYY-MM-DD. Every stored date (history records,
+// meals, weigh-ins, the program start) is a local calendar day; toISOString() gives the
+// UTC day instead, which between local midnight and the UTC offset is yesterday (east of
+// UTC) or tomorrow (west of it).
+const localISO = (d) => {
+  const x = d == null ? new Date() : (d instanceof Date ? d : new Date(d));
+  const pad = (n) => String(n).padStart(2, '0');
+  return x.getFullYear() + '-' + pad(x.getMonth() + 1) + '-' + pad(x.getDate());
+};
 const TYPES = ['Push', 'Pull', 'Legs', 'Cardio', 'Rest', 'Custom'];
 const TYPE_COLOR = { Push: '#7B8C6E', Pull: '#9C7F66', Legs: '#C0895A', Cardio: '#B26658', Custom: '#6E8B9C', Rest: '#A89F92' };
 const TYPE_TINT = { Push: 'rgba(123,140,110,.16)', Pull: 'rgba(156,127,102,.16)', Legs: 'rgba(192,137,90,.16)', Cardio: 'rgba(178,102,88,.16)', Custom: 'rgba(110,139,156,.16)', Rest: 'rgba(168,159,146,.16)' };
@@ -173,7 +182,7 @@ function migrateArchive(arr) {
           sessions = sessions.map(se => {
             const offset = DAYS.indexOf(se.day);
             const d = new Date(start); d.setDate(d.getDate() + (offset >= 0 ? offset : 0));
-            return se.date ? se : { ...se, date: d.toISOString().slice(0, 10) };
+            return se.date ? se : { ...se, date: localISO(d) };
           });
           dates = sessions.map(se => se.date).filter(Boolean).sort();
         }
@@ -194,8 +203,39 @@ function migrateArchive(arr) {
 const weekStartISO = (iso) => {
   const d = new Date(iso + 'T00:00:00');
   d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
-  return d.toISOString().slice(0, 10);
+  return localISO(d);
 };
+
+// Records saved while dates were stamped in UTC can sit a day off their real calendar
+// day. Put them back, conservatively, using only evidence the record itself carries:
+// - a workout record names its weekday (`day`); when its date falls on a neighbouring
+//   weekday instead, it moves to that neighbour's date;
+// - a meal or weigh-in has the `ts` it was logged at; when its date is exactly the UTC
+//   day of that ts and the local day differs, it takes the local day (a weigh-in only
+//   when no entry already holds that day — one per date).
+// Idempotent, so it simply runs on every load. Returns the same arrays when nothing moved.
+const shiftISO = (iso, n) => { const d = new Date(iso + 'T00:00:00'); d.setDate(d.getDate() + n); return localISO(d); };
+const weekdayOf = (iso) => DAYS[(new Date(iso + 'T00:00:00').getDay() + 6) % 7];
+const fixRecordDate = (r) => {
+  if (!r || !r.date || !r.day || weekdayOf(r.date) === r.day) return r;
+  const n = weekdayOf(shiftISO(r.date, 1)) === r.day ? 1 : (weekdayOf(shiftISO(r.date, -1)) === r.day ? -1 : 0);
+  return n ? { ...r, date: shiftISO(r.date, n) } : r;
+};
+const utcISO = (ts) => new Date(ts).toISOString().slice(0, 10);
+const tsDayFix = (x) => (x && x.ts && x.date === utcISO(x.ts) && localISO(x.ts) !== x.date ? localISO(x.ts) : null);
+function fixUtcDates(d) {
+  const mapSame = (arr, f) => { if (!Array.isArray(arr)) return arr; let ch = false; const out = arr.map(x => { const y = f(x); if (y !== x) ch = true; return y; }); return ch ? out : arr; };
+  const sessionHistory = mapSame(d.sessionHistory, fixRecordDate);
+  const archive = mapSame(d.archive, w => { const ss = mapSame(w && w.sessions, fixRecordDate); return ss === (w && w.sessions) ? w : { ...w, sessions: ss }; });
+  const meals = mapSame(d.meals, m => { const to = tsDayFix(m); return to ? { ...m, date: to } : m; });
+  let weights = d.weights;
+  if (Array.isArray(weights)) {
+    const taken = {}; weights.forEach(w => { if (w) taken[w.date] = true; });
+    weights = mapSame(weights, w => { const to = tsDayFix(w); if (!to || taken[to]) return w; taken[to] = true; return { ...w, date: to }; });
+    if (weights !== d.weights) weights = weights.slice().sort((a, b) => (a.date < b.date ? -1 : 1));
+  }
+  return { ...d, sessionHistory, archive, meals, weights };
+}
 // Inclusive day span between two ISO dates.
 const daySpan = (a, b) => Math.max(1, Math.round((new Date(b + 'T00:00:00') - new Date(a + 'T00:00:00')) / 86400000) + 1);
 const fmtDateShort = (iso) => { try { return new Date(iso + 'T00:00:00').toLocaleDateString('en-US', { day: 'numeric', month: 'short' }); } catch (e) { return iso; } };
@@ -525,7 +565,7 @@ export {
   INTENSITIES, typeLabel, dayTypeName, TUT_STEPS, ONB_DEFAULTS, DEFAULT_EX, CARDIO_TYPES, seedCardioDb,
   PACES,
   migrateCardioDb, fmt, fmtDate, fmtDateShort, MONTH_ABBR, migrateArchive, exVol, W_DEFAULTS, scheme,
-  weekStartISO, daySpan, KCAL_PER_KG, topWeight, loggedLine, exerciseNotes,
+  weekStartISO, daySpan, KCAL_PER_KG, localISO, fixUtcDates, topWeight, loggedLine, exerciseNotes,
   isTimed, isBodyweight, fmtSecs, parseSecs, hasRange, repTarget, loadLabel, setVol, setLoad, exHoldSecs,
   cardioRpe, rpeIntensity, cardioLine, fmtKm,
   seedSessions, seedExerciseDb, migrateExerciseDb, eqToOptions, eqLabel, KEY, BODY_PARTS,

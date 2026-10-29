@@ -10,7 +10,7 @@ import {
   INTENSITIES, typeLabel, dayTypeName, TUT_STEPS, ONB_DEFAULTS, DEFAULT_EX, CARDIO_TYPES, seedCardioDb,
   PACES,
   migrateCardioDb, fmt, fmtDate, fmtDateShort, migrateArchive, exVol, W_DEFAULTS, scheme,
-  weekStartISO, daySpan, KCAL_PER_KG, topWeight, loggedLine, exerciseNotes,
+  weekStartISO, daySpan, KCAL_PER_KG, localISO, fixUtcDates, topWeight, loggedLine, exerciseNotes,
   seedSessions, seedExerciseDb, migrateExerciseDb, eqToOptions, eqLabel, KEY, BODY_PARTS,
   PLATE, MACRO_COLORS, ACTIVITY, ACTIVITY_MULT, GOALS, GOAL_RULES, DEFAULT_RECOVERY,
   RPE_SCALE, fmtKcal, mealMacroLine, GPU, itemMacros, sumItems, timeLabel,
@@ -64,7 +64,7 @@ export default class App extends React.Component {
       week,
       sessions: seedSessions(week, program),
       sessionHistory: [],
-      programStartDate: new Date().toISOString().slice(0, 10),
+      programStartDate: localISO(),
       programName: 'Program 1',
       programRename: null,
       programPrint: null,
@@ -270,7 +270,7 @@ export default class App extends React.Component {
     this._themeTimer = setInterval(() => this.applyAutoTheme(), 60 * 1000);
     this._autoTimer = setInterval(() => { this.applyAutoTheme(); this.refreshToday(); this.checkSupplementsReset(); this.normalizeCompletions(); this.maybeRefreshWeather(); }, 5 * 60 * 1000);
     this._armMidnight();
-    try { const raw = localStorage.getItem(KEY); if (raw) { const d = JSON.parse(raw); const wk = this.reconcileWeekOverrides(d); this.setState({ recurring: d.recurring || this.state.recurring, week: wk.week || d.week || this.state.week, sessions: wk.sessions || d.sessions || this.state.sessions, weekOverrides: wk.weekOverrides, program: d.program || this.state.program, sessionHistory: d.sessionHistory || this.state.sessionHistory, programStartDate: d.programStartDate || this.state.programStartDate, programName: d.programName || this.state.programName, weights: Array.isArray(d.weights) ? d.weights : [], archive: migrateArchive(d.archive || this.state.archive), supplements: d.supplements || this.state.supplements, supplementsChecked: d.supplementsChecked || this.state.supplementsChecked, supplementsDate: d.supplementsDate || this.state.supplementsDate, exerciseDb: migrateExerciseDb(d.exerciseDb), profile: d.profile || null, meals: d.meals || [], customMeals: d.customMeals || [], tutorialDone: !!d.tutorialDone, recoveryProfile: d.recoveryProfile || { ...DEFAULT_RECOVERY }, recoveryLog: d.recoveryLog || [], cardioDb: migrateCardioDb(d.cardioDb), customLabels: d.customLabels || {}, restMode: !!d.restMode, flowPhase: (d.profile ? (d.tutorialDone ? 'done' : 'tutorial') : 'onboarding'), tutStep: (d.profile && !d.tutorialDone) ? Math.min(TUT_STEPS.length - 1, Math.max(0, parseInt(localStorage.getItem('lt_tut_step') || '0', 10) || 0)) : 0 }, () => { this.checkSupplementsReset(); this.normalizeCompletions(); this.maybeRecalibrate(); this._tutMeasureSoon(1100); }); } else { this.setState({ flowPhase: 'splash' }); this.checkSupplementsReset(); } } catch (e) {}
+    try { const raw = localStorage.getItem(KEY); if (raw) { const d = fixUtcDates(JSON.parse(raw)); const wk = this.reconcileWeekOverrides(d); this.setState({ recurring: d.recurring || this.state.recurring, week: wk.week || d.week || this.state.week, sessions: wk.sessions || d.sessions || this.state.sessions, weekOverrides: wk.weekOverrides, program: d.program || this.state.program, sessionHistory: d.sessionHistory || this.state.sessionHistory, programStartDate: d.programStartDate || this.state.programStartDate, programName: d.programName || this.state.programName, weights: Array.isArray(d.weights) ? d.weights : [], archive: migrateArchive(d.archive || this.state.archive), supplements: d.supplements || this.state.supplements, supplementsChecked: d.supplementsChecked || this.state.supplementsChecked, supplementsDate: d.supplementsDate || this.state.supplementsDate, exerciseDb: migrateExerciseDb(d.exerciseDb), profile: d.profile || null, meals: d.meals || [], customMeals: d.customMeals || [], tutorialDone: !!d.tutorialDone, recoveryProfile: d.recoveryProfile || { ...DEFAULT_RECOVERY }, recoveryLog: d.recoveryLog || [], cardioDb: migrateCardioDb(d.cardioDb), customLabels: d.customLabels || {}, restMode: !!d.restMode, flowPhase: (d.profile ? (d.tutorialDone ? 'done' : 'tutorial') : 'onboarding'), tutStep: (d.profile && !d.tutorialDone) ? Math.min(TUT_STEPS.length - 1, Math.max(0, parseInt(localStorage.getItem('lt_tut_step') || '0', 10) || 0)) : 0 }, () => { this.checkSupplementsReset(); this.normalizeCompletions(); this.maybeRecalibrate(); this._tutMeasureSoon(1100); }); } else { this.setState({ flowPhase: 'splash' }); this.checkSupplementsReset(); } } catch (e) {}
     this._loadTimer = setTimeout(() => this.setState({ loading: false }), 800);
     this.initWeather();
     this._ptrDetach = window.LT && window.LT.attach({ onRefresh: () => new Promise((r) => setTimeout(r, 600)) });
@@ -480,7 +480,7 @@ export default class App extends React.Component {
     try {
       const raw = localStorage.getItem(KEY);
       if (raw) {
-        const d = JSON.parse(raw);
+        const d = fixUtcDates(JSON.parse(raw));
         const rwk = this.reconcileWeekOverrides(d);
         this.setState({
           recurring: d.recurring || this.state.recurring, week: rwk.week || d.week || this.state.week, sessions: rwk.sessions || d.sessions || {}, weekOverrides: rwk.weekOverrides,
@@ -2081,7 +2081,10 @@ export default class App extends React.Component {
     this._printReport('nutritionPrint', np);
   }
 
-  todayISO() { return new Date().toISOString().slice(0, 10); }
+  // Today's LOCAL calendar day — see localISO. (This used the UTC day, so a session
+  // completed after local midnight was dated yesterday; on a Monday that put it in last
+  // week and loggedThisWeek() stopped counting it.)
+  todayISO() { return localISO(); }
 
   // ---- body weight ----
   // One entry per date (re-logging the same day overwrites it). The profile's weight
@@ -2470,7 +2473,7 @@ export default class App extends React.Component {
       } else break;
     }
     // weekly RPE load
-    const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
+    const weekAgo = localISO(Date.now() - 7 * 86400000);
     const weeklyLoad = done.filter(h => h.date >= weekAgo).reduce((a, h) => a + h.rpe, 0);
     const consecThreshold = Math.max(2, Math.round(profile.learned_consecutive_days));
     const byConsec = consec >= consecThreshold;
@@ -2541,7 +2544,7 @@ export default class App extends React.Component {
   respondRecovery(choice) {
     const rp = this.state.recoveryPrompt; if (!rp) return;
     const ignored = choice !== 'break';
-    const entry = { id: rp.id, date: new Date().toISOString().slice(0, 10), suggested: true, ignored, choice, action: null, nextPerf: null, outcome: null };
+    const entry = { id: rp.id, date: localISO(), suggested: true, ignored, choice, action: null, nextPerf: null, outcome: null };
     const log = (this.state.recoveryLog || []).concat([entry]);
     if (choice === 'break') {
       // navigate to tomorrow's workout in reschedule mode
@@ -3585,7 +3588,7 @@ export default class App extends React.Component {
     } : null;
 
     // ===== meals / nutrition =====
-    const todayISO = new Date().toISOString().slice(0, 10);
+    const todayISO = localISO();
     const prof = s.profile;
     const todayMeals = (s.meals || []).filter(m => m.date === todayISO).sort((a, b) => b.ts - a.ts);
     const tots = todayMeals.reduce((a, m) => ({ p: a.p + m.protein, c: a.c + m.carbs, f: a.f + m.fat, cal: a.cal + m.calories }), { p: 0, c: 0, f: 0, cal: 0 });
@@ -3936,7 +3939,7 @@ export default class App extends React.Component {
     const logCustom = (cm) => {
       const t = sumItems(cm.items);
       const nowD = new Date();
-      const meal = { id: 'meal_' + Date.now(), date: nowD.toISOString().slice(0, 10), ts: nowD.getTime(), name: cm.name, items: cm.items.map(x => ({ ...x })), ...t };
+      const meal = { id: 'meal_' + Date.now(), date: localISO(nowD), ts: nowD.getTime(), name: cm.name, items: cm.items.map(x => ({ ...x })), ...t };
       this.haptic(true);
       this.save({ meals: [...(this.state.meals || []), meal] }, 'logging that meal');
       this.showToast('"' + cm.name + '" added to today.');
@@ -4154,7 +4157,7 @@ export default class App extends React.Component {
       weightFormOpen: !!s.weightForm, wf,
       openMeals: () => this.setState({ screen: 'meals', menuOpen: false }),
       editProfile: () => this.setState({ profileEditOpen: true, profileForm: { name: prof ? prof.name : '', height: String(prof ? prof.height : ''), weight: String(prof ? prof.weight : ''), age: String(prof ? prof.age : ''), sex: prof ? prof.sex : 'Male', goal: prof ? prof.goal : 'Maintain', pace: (prof && prof.pace) || 'Moderate', activity: prof ? prof.activity : 'Moderately Active' } }),
-      openExport: () => this.setState({ exportForm: { from: new Date(Date.now() - 6 * 86400000).toISOString().slice(0, 10), to: todayISO } }),
+      openExport: () => this.setState({ exportForm: { from: localISO(Date.now() - 6 * 86400000), to: todayISO } }),
       exportOpen: !!exf,
       closeExport: () => this.setState({ exportForm: null }),
       openMealAdd: () => this.setState({ mealAdd: { tab: 'text', text: '', search: '', results: [], searching: false, searchErr: '', items: [], busy: false, error: '', photoName: '' } }),
@@ -4171,7 +4174,7 @@ export default class App extends React.Component {
         if (name.length > 48) name = name.slice(0, 48) + '…';
         name = name.charAt(0).toUpperCase() + name.slice(1);
         const nowD = new Date();
-        const meal = { id: 'meal_' + Date.now(), date: nowD.toISOString().slice(0, 10), ts: nowD.getTime(), name, items: f.items, ...t };
+        const meal = { id: 'meal_' + Date.now(), date: localISO(nowD), ts: nowD.getTime(), name, items: f.items, ...t };
         this.haptic(true);
         this.setState({ mealAdd: null });
         this.save({ meals: [...(this.state.meals || []), meal] }, 'logging that meal');
@@ -4445,7 +4448,7 @@ export default class App extends React.Component {
         confirm: () => {
           this.haptic(true);
           let sessionHistory = (this.state.sessionHistory || []).slice();
-          const todayISO = new Date().toISOString().slice(0, 10);
+          const todayISO = localISO();
           const vol = (asess.exercises || []).reduce((a, e) => a + this.exVol(e), 0);
           const rec = { id: this.historyId(ad, aslot, todayISO), slot: aslot, date: todayISO, day: ad, type: at, label: aslot === 'b' ? slotName('b') : asess.label, exercises: (asess.exercises || []).map(x => ({ ...x })), volume: vol, completed: true };
           const idx = sessionHistory.findIndex(r => r.id === rec.id);

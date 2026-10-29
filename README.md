@@ -308,3 +308,23 @@ and the phone vibrates where `navigator.vibrate` exists.
 weather, theme, week, today, weight, supps, nutri, menu), and the spotlight scrolls the
 target into view first. Steps about screens the tour can't open have no target and are
 shown centred. You can replay it from Menu → Replay Tutorial.
+
+
+## Dates are local calendar days
+
+Every stored date (history records, meals, weigh-ins, the program start, recovery log)
+is the **local** calendar day, from `localISO()` in `src/lib/data.js`, and `todayISO()`
+uses it too. Dates used to come from `toISOString()`, which gives the UTC day. Between
+local midnight and the UTC offset that is yesterday east of UTC (tomorrow west of it). A
+workout finished at 01:30 on a Monday in Cyprus was dated Sunday, landed in last week, and
+`normalizeCompletions()` then cleared its completed flag. `weekStartISO()` had the same
+slip and labelled report weeks a day early.
+
+Records saved before the fix are repaired on load by `fixUtcDates()`. It is idempotent and
+only uses evidence the record carries: a workout whose date falls on a weekday next to its
+own `day` moves to that day, and a meal or weigh-in whose date is exactly the UTC day of its
+`ts` takes the local day (a weigh-in only if that day is free). Record ids keep their old
+date, because recovery-log entries point at them.
+
+**Manual check:** set the device clock to a Monday at 01:30, complete a workout, and the
+week strip shows Monday as Done. It stays Done after backgrounding and returning.
