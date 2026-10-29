@@ -53,7 +53,7 @@ export default function WeekScreen({ v }) {
         <span style={s('font-size:15px; font-weight:800; color:var(--text); letter-spacing:-.01em;')}>Weight</span>
         <button onClick={v.bw.open} style={s('border:1px solid var(--border); background:var(--surface); cursor:pointer; font-family:inherit; font-size:11.5px; font-weight:700; color:var(--primary); padding:6px 13px; border-radius:999px;')}>{v.bw.ctaLabel}</button>
       </div>
-      <div onClick={v.bw.open} style={s('background:var(--surface); border:1px solid var(--border); border-radius:20px; padding:15px 16px; box-shadow:var(--shadow); cursor:pointer;')}>
+      <div onClick={v.bw.open} data-tut="weight" style={s('background:var(--surface); border:1px solid var(--border); border-radius:20px; padding:15px 16px; box-shadow:var(--shadow); cursor:pointer;')}>
         <div style={s('display:flex; align-items:flex-end; justify-content:space-between; gap:12px;')}>
           <div style={s('min-width:0;')}>
             <div style={s('font-size:10.5px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.06em;')}>{v.bw.dateLabel}</div>

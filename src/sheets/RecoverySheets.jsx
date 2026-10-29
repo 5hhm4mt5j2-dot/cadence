@@ -1,4 +1,5 @@
 import { s } from '../lib/helpers';
+import CardioFields from '../components/CardioFields';
 
 export function WorkoutSettingsSheet({ v }) {
   const wsx = v.wsx;
@@ -89,15 +90,7 @@ export function RpeSheet({ v }) {
               {rpe.cardio.map((c, i) => (
                 <div key={i} style={s('background:var(--surface-2); border-radius:14px; padding:13px 14px;')}>
                   <div style={s('font-size:13px; font-weight:700; color:var(--text);')}>{c.name}</div>
-                  <div style={s('display:flex; align-items:center; gap:10px; margin-top:10px;')}>
-                    <span style={s('font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.05em;')}>Min</span>
-                    <input type="number" value={c.duration} onChange={c.onDuration} style={s("width:70px; border:1px solid var(--border); border-radius:10px; padding:8px 10px; background:var(--surface); font-family:'JetBrains Mono',monospace; font-size:16px; font-weight:700; color:var(--text); outline:none; text-align:center;")} />
-                  </div>
-                  <div style={s('display:flex; gap:7px; margin-top:10px;')}>
-                    {c.intensities.map((it, j) => (
-                      <button key={j} onClick={it.pick} style={s(`flex:1; border:none; cursor:pointer; font-family:inherit; font-size:12px; font-weight:700; padding:9px 0; border-radius:10px; background:${it.bg}; color:${it.color};`)}>{it.label}</button>
-                    ))}
-                  </div>
+                  <CardioFields c={c} compact />
                 </div>
               ))}
             </div>

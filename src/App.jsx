@@ -14,8 +14,10 @@ import {
   seedSessions, seedExerciseDb, migrateExerciseDb, eqToOptions, eqLabel, KEY, BODY_PARTS,
   PLATE, MACRO_COLORS, ACTIVITY, ACTIVITY_MULT, GOALS, GOAL_RULES, DEFAULT_RECOVERY,
   RPE_SCALE, fmtKcal, mealMacroLine, GPU, itemMacros, sumItems, timeLabel,
-  numOrEmpty,
+  numOrEmpty, isTimed, isBodyweight, fmtSecs, parseSecs, hasRange, repTarget, loadLabel, setVol,
+  exHoldSecs, cardioRpe, rpeIntensity, cardioLine,
 } from './lib/data';
+import { downloadProgramPdf, preloadPdf } from './lib/pdf';
 import { s } from './lib/helpers';
 import Shell from './components/Shell';
 
@@ -152,7 +154,52 @@ export default class App extends React.Component {
     };
   }
 
-  isNightNow() { const h = new Date().getHours(); return h < 6 || h >= 19; }
+  // ---- automatic theme (#11) ----
+  // Dark from 19:00 to 07:00 by the device clock, light otherwise. A manual pick (the
+  // header toggle or Menu → Appearance) holds until the next 07:00/19:00 boundary, then
+  // the schedule takes over again; the minute tick below is what notices the boundary.
+  isNightNow() { const h = new Date().getHours(); return h < 7 || h >= 19; }
+  nextThemeBoundary() {
+    const n = new Date(); const h = n.getHours();
+    // Hour 31 rolls over to 07:00 tomorrow.
+    return new Date(n.getFullYear(), n.getMonth(), n.getDate(), h < 7 ? 7 : (h < 19 ? 19 : 31), 0, 0).getTime();
+  }
+  // Restore a manual pick only while its window is still open; anything older (including
+  // overrides saved before they expired) falls back to the schedule.
+  _loadThemePref() {
+    let t = null, auto = true, until = 0;
+    try { t = localStorage.getItem('lt_theme'); auto = localStorage.getItem('lt_theme_auto') !== 'false'; until = +(localStorage.getItem('lt_theme_until') || 0); } catch (e) {}
+    if (!auto && t && until > Date.now()) { this._themeUntil = until; this.setState({ theme: t, themeAuto: false }); return; }
+    this._themeUntil = null;
+    this.setState({ themeAuto: true }, () => this.applyAutoTheme());
+  }
+
+  // ---- body weight as load (#5) ----
+  // The most recent weigh-in, else the profile's weight. Memoised on the two references it
+  // reads because volume is summed for every exercise on every render.
+  bodyweightKg() {
+    const ws = this.state.weights || [], prof = this.state.profile;
+    const m = this._bwMemo;
+    if (m && m.ws === ws && m.prof === prof) return m.kg;
+    let last = null;
+    ws.forEach(w => { if (w && w.kg > 0 && (!last || w.date >= last.date)) last = w; });
+    const kg = last ? last.kg : ((prof && +prof.weight) || 0);
+    this._bwMemo = { ws, prof, kg };
+    return kg;
+  }
+  exVol(e) { return exVol(e, this.bodyweightKg()); }
+  // A logged record's volume, recomputed rather than read from `rec.volume` so records
+  // written before bodyweight counted (or with a stale total) read the same as new ones.
+  recordVolume(rec) { return ((rec && rec.exercises) || []).reduce((a, e) => a + this.exVol(e), 0); }
+  // #8 — a logged record that stands for a completed day: not un-completed afterwards,
+  // and holding real work (a logged set, planned load, a hold, or cardio time/distance).
+  // Rest days and records that never had anything done in them don't count.
+  recordCompleted(rec) {
+    if (!rec || rec.completed === false || rec.type === 'Rest' && !(rec.exercises || []).length) return false;
+    return (rec.exercises || []).some(e => (e.cardio
+      ? (+e.duration > 0 || +e.distance > 0)
+      : ((e.logged || []).some(l => !l.skipped) || this.exVol(e) > 0 || exHoldSecs(e) > 0)));
+  }
 
   // Supplements roll over at 03:00 local (not midnight) so before-bed doses (ZMA etc.)
   // logged after midnight aren't wiped. Shift "now" back 3h, then take the local date.
@@ -168,10 +215,14 @@ export default class App extends React.Component {
   }
 
   applyAutoTheme() {
-    if (!this.state.themeAuto) return;
-    const systemDark = this._mq && this._mq.matches;
-    const dark = systemDark || this.isNightNow();
-    this.setState({ theme: dark ? 'dark' : 'light' });
+    if (!this.state.themeAuto) {
+      if (this._themeUntil && Date.now() < this._themeUntil) return;
+      // The manual pick ran out at a 07:00/19:00 boundary — back to the schedule.
+      this._themeUntil = null;
+      try { localStorage.setItem('lt_theme_auto', 'true'); localStorage.removeItem('lt_theme_until'); } catch (e) {}
+    }
+    const theme = this.isNightNow() ? 'dark' : 'light';
+    if (theme !== this.state.theme || !this.state.themeAuto) this.setState({ theme, themeAuto: true });
   }
 
   // ---- day rollover ----
@@ -210,19 +261,13 @@ export default class App extends React.Component {
     this._woVis = () => {
       if (document.visibilityState !== 'visible') return;
       if (this.state.workout) this._woWake();
+      this.applyAutoTheme();
       this.refreshToday();
       this.normalizeCompletions();
     };
     document.addEventListener('visibilitychange', this._woVis);
-    try {
-      const savedAuto = localStorage.getItem('lt_theme_auto');
-      const auto = savedAuto === null ? true : savedAuto === 'true';
-      this.setState({ themeAuto: auto }, () => {
-        if (!auto) { const t = localStorage.getItem('lt_theme'); if (t) this.setState({ theme: t }); }
-        else this.applyAutoTheme();
-      });
-    } catch (e) {}
-    try { this._mq = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)'); this._mqHandler = () => this.applyAutoTheme(); this._mq && this._mq.addEventListener && this._mq.addEventListener('change', this._mqHandler); } catch (e) {}
+    this._loadThemePref();
+    this._themeTimer = setInterval(() => this.applyAutoTheme(), 60 * 1000);
     this._autoTimer = setInterval(() => { this.applyAutoTheme(); this.refreshToday(); this.checkSupplementsReset(); this.normalizeCompletions(); this.maybeRefreshWeather(); }, 5 * 60 * 1000);
     this._armMidnight();
     try { const raw = localStorage.getItem(KEY); if (raw) { const d = JSON.parse(raw); const wk = this.reconcileWeekOverrides(d); this.setState({ recurring: d.recurring || this.state.recurring, week: wk.week || d.week || this.state.week, sessions: wk.sessions || d.sessions || this.state.sessions, weekOverrides: wk.weekOverrides, program: d.program || this.state.program, sessionHistory: d.sessionHistory || this.state.sessionHistory, programStartDate: d.programStartDate || this.state.programStartDate, programName: d.programName || this.state.programName, weights: Array.isArray(d.weights) ? d.weights : [], archive: migrateArchive(d.archive || this.state.archive), supplements: d.supplements || this.state.supplements, supplementsChecked: d.supplementsChecked || this.state.supplementsChecked, supplementsDate: d.supplementsDate || this.state.supplementsDate, exerciseDb: migrateExerciseDb(d.exerciseDb), profile: d.profile || null, meals: d.meals || [], customMeals: d.customMeals || [], tutorialDone: !!d.tutorialDone, recoveryProfile: d.recoveryProfile || { ...DEFAULT_RECOVERY }, recoveryLog: d.recoveryLog || [], cardioDb: migrateCardioDb(d.cardioDb), customLabels: d.customLabels || {}, restMode: !!d.restMode, flowPhase: (d.profile ? (d.tutorialDone ? 'done' : 'tutorial') : 'onboarding'), tutStep: (d.profile && !d.tutorialDone) ? Math.min(TUT_STEPS.length - 1, Math.max(0, parseInt(localStorage.getItem('lt_tut_step') || '0', 10) || 0)) : 0 }, () => { this.checkSupplementsReset(); this.normalizeCompletions(); this.maybeRecalibrate(); this._tutMeasureSoon(1100); }); } else { this.setState({ flowPhase: 'splash' }); this.checkSupplementsReset(); } } catch (e) {}
@@ -242,18 +287,26 @@ export default class App extends React.Component {
     this._scrollRoot.addEventListener('scroll', this._onAnyScroll, { capture: true, passive: true });
   }
   componentWillUnmount() {
-    clearTimeout(this._loadTimer); clearInterval(this._autoTimer); clearTimeout(this._midnightT); this._ptrDetach && this._ptrDetach();
+    clearTimeout(this._loadTimer); clearInterval(this._autoTimer); clearInterval(this._themeTimer); clearTimeout(this._midnightT); this._ptrDetach && this._ptrDetach();
     clearInterval(this._woTick); clearTimeout(this._woIdleT); this._woHoldEnd();
     try { this._wl && this._wl.release(); } catch (e) {}
     try { document.removeEventListener('visibilitychange', this._woVis); } catch (e) {}
     try { this._scrollRoot && this._scrollRoot.removeEventListener('scroll', this._onAnyScroll, { capture: true }); } catch (e) {}
-    try { this._mq && this._mq.removeEventListener && this._mq.removeEventListener('change', this._mqHandler); } catch (e) {}
   }
 
+  // Flips the look either way: on the schedule it overrides until the next boundary; while
+  // overridden it hands back to the schedule (which is always the other look).
   toggleTheme() {
+    if (!this.state.themeAuto) {
+      this._themeUntil = null;
+      try { localStorage.setItem('lt_theme_auto', 'true'); localStorage.removeItem('lt_theme_until'); } catch (e) {}
+      this.setState({ themeAuto: true }, () => this.applyAutoTheme());
+      return;
+    }
     const next = this.state.theme === 'dark' ? 'light' : 'dark';
+    this._themeUntil = this.nextThemeBoundary();
     this.setState({ theme: next, themeAuto: false });
-    try { localStorage.setItem('lt_theme', next); localStorage.setItem('lt_theme_auto', 'false'); } catch (e) {}
+    try { localStorage.setItem('lt_theme', next); localStorage.setItem('lt_theme_auto', 'false'); localStorage.setItem('lt_theme_until', String(this._themeUntil)); } catch (e) {}
   }
 
   // `undoLabel` names the action for the undo button's toast. Pass `null` to keep a
@@ -317,7 +370,7 @@ export default class App extends React.Component {
       const pos = this._nextPos(exs);
       if (!pos) { this.setState({ workout: { day: w.day, slot, phase: 'summary' }, workoutIdle: false }); return; }
       const pf = this._prefill(exs[pos.exIdx]);
-      this.setState({ workout: { day: w.day, slot, exIdx: pos.exIdx, setIdx: pos.setIdx, phase: 'set', reps: pf.reps, weight: pf.weight, editSet: null }, workoutIdle: false });
+      this.setState({ workout: { day: w.day, slot, exIdx: pos.exIdx, setIdx: pos.setIdx, phase: 'set', reps: pf.reps, weight: pf.weight, secs: pf.secs, editSet: null }, workoutIdle: false });
       this._woIdleReset();
     }, 0);
   }
@@ -441,7 +494,7 @@ export default class App extends React.Component {
         }, () => { this.checkSupplementsReset(); this.normalizeCompletions(); this.maybeRecalibrate(); this._tutMeasureSoon(1100); });
       } else { this.setState({ importing: false }); }
     } catch (e) { this.setState({ importing: false }); }
-    try { const t = localStorage.getItem('lt_theme'), auto = localStorage.getItem('lt_theme_auto'); if (auto === 'false' && t) this.setState({ theme: t, themeAuto: false }); else this.applyAutoTheme(); } catch (e) {}
+    this._loadThemePref();
     this.initWeather();
   }
 
@@ -498,7 +551,7 @@ export default class App extends React.Component {
     if (!sess || !sess.completed) return null;
     const rec = this.historyRecordFor(day, slot);
     if (!rec) return null;
-    const vol = (exercises || []).reduce((a, e) => a + exVol(e), 0);
+    const vol = (exercises || []).reduce((a, e) => a + this.exVol(e), 0);
     return (this.state.sessionHistory || []).map(r => (r.id === rec.id
       ? { ...r, exercises: (exercises || []).map(x => ({ ...x })), volume: vol }
       : r));
@@ -510,7 +563,8 @@ export default class App extends React.Component {
       name: e.name, cardio: !!e.cardio,
       sets: e.sets != null ? e.sets : 0, reps: e.reps != null ? e.reps : 0, weight: e.weight != null ? e.weight : 0,
       duration: e.duration != null ? e.duration : 0, intensity: e.intensity || 'Moderate',
-      logged: (e.logged || []).map(l => ({ reps: l.reps != null ? l.reps : '', weight: l.weight != null ? l.weight : '', skipped: !!l.skipped })),
+      distance: e.distance != null ? e.distance : '', rpe: e.cardio ? cardioRpe(e) : null, timed: isTimed(e),
+      logged: (e.logged || []).map(l => ({ reps: l.reps != null ? l.reps : '', weight: l.weight != null ? l.weight : '', secs: l.secs != null ? l.secs : '', skipped: !!l.skipped })),
     }));
   }
 
@@ -1034,6 +1088,95 @@ export default class App extends React.Component {
     return (this.state.customLabels || {})[day] || '';
   }
 
+  // The exercise sheet's working copy of an exercise. `timed` / `bw` stay null unless the
+  // exercise carries an explicit flag, so they keep following the name until toggled.
+  _exFormFrom(e, base) {
+    return {
+      ...base,
+      name: e.name, cardio: !!e.cardio, sets: e.sets, reps: e.reps, weight: e.weight,
+      duration: e.duration, intensity: e.intensity, distance: e.distance != null ? e.distance : '', rpe: e.cardio ? cardioRpe(e) : null,
+      supersetWith: e.supersetWith || '', dropset: e.dropset || null,
+      repRange: hasRange(e), repsMin: hasRange(e) ? e.repsMin : (e.reps || ''), repsMax: hasRange(e) ? e.repsMax : '',
+      timed: e.timed != null ? !!e.timed : null, bw: e.bw != null ? !!e.bw : null,
+      holdSecs: e.holdSecs != null ? e.holdSecs : 30,
+    };
+  }
+  // Ten effort chips (RPE 1–10) for a cardio entry.
+  _effortChips(cur, pick) {
+    return RPE_SCALE.map(r => ({ label: String(r.n), bg: +cur === r.n ? TYPE_COLOR.Cardio : 'var(--surface-2)', color: +cur === r.n ? '#fff' : 'var(--text)', pick: () => pick(r.n) }));
+  }
+  _formTimed(f) { return f.timed != null ? !!f.timed : isTimed({ name: f.name }); }
+  _formBw(f) { return f.bw != null ? !!f.bw : isBodyweight({ name: f.name, timed: this._formTimed(f) }); }
+
+  // The exercise the sheet would save. Only the fields that apply are written, and the
+  // timed / bodyweight flags only when they differ from what the name implies.
+  _exItemFromForm(f) {
+    if (f.cardio) {
+      const rpe = Math.min(10, Math.max(1, +f.rpe || 5));
+      return { name: f.name || 'Cardio', cardio: true, duration: +f.duration || 0, distance: +f.distance || 0, rpe, intensity: rpeIntensity(rpe) };
+    }
+    const timed = this._formTimed(f), bw = this._formBw(f);
+    const item = { name: f.name || 'Exercise', sets: f.sets || 0, reps: f.reps || 0, weight: f.weight || 0 };
+    if (timed !== isTimed({ name: item.name })) item.timed = timed;
+    if (!timed && bw !== isBodyweight({ name: item.name })) item.bw = bw;
+    if (timed) item.holdSecs = Math.max(1, Math.min(3600, f.holdSecs || 30));
+    else if (f.repRange && +f.repsMax > +f.repsMin && +f.repsMin > 0) {
+      // The range is a display target; `reps` keeps its low end so planned volume stays
+      // a number and nothing downstream needs to know about ranges.
+      item.repsMin = +f.repsMin; item.repsMax = +f.repsMax; item.reps = +f.repsMin;
+    }
+    if (f.supersetWith) item.supersetWith = f.supersetWith;
+    if (f.dropset && !timed) item.dropset = { pct: f.dropset.pct };
+    return item;
+  }
+
+  // Write an exercise into a day's list (index null = append) and keep superset pairs
+  // two-sided: a partner already on the day gets the link back, a partner picked from
+  // the Exercise Database is added straight after it in the same step (#3), and turning
+  // the superset off clears the partner's half. Logged sets on the edited exercise stay.
+  _applyExerciseEdit(list, index, item, prevPartner) {
+    const out = (list || []).map(x => ({ ...x }));
+    let at;
+    if (index === null || index === undefined || index >= out.length) { out.push({ ...item }); at = out.length - 1; }
+    else { const old = out[index]; out[index] = { ...item, ...(old.logged ? { logged: old.logged } : {}) }; at = index; }
+    if (prevPartner && prevPartner !== item.supersetWith) {
+      out.forEach((x, j) => { if (j !== at && x.name === prevPartner && x.supersetWith === item.name) delete x.supersetWith; });
+    }
+    if (item.supersetWith) {
+      const pj = out.findIndex((x, j) => j !== at && !x.cardio && x.name === item.supersetWith);
+      if (pj >= 0) {
+        if (!out[pj].supersetWith) out[pj].supersetWith = item.name;
+      } else {
+        const lu = this.lastUsedFor(item.supersetWith);
+        const partner = { name: item.supersetWith, sets: item.sets || 3, reps: item.reps || 10, weight: lu ? (lu.weight || 0) : 0, supersetWith: item.name };
+        if (isTimed(partner)) partner.holdSecs = 30;
+        out.splice(at + 1, 0, partner);
+      }
+    }
+    return out;
+  }
+
+  // A partner left behind stops pointing at the exercise that went.
+  _unpair(x, gone) {
+    if (!gone || x.supersetWith !== gone.name) return x;
+    const c = { ...x }; delete c.supersetWith; return c;
+  }
+
+  // #3 — the whole Exercise Database, filtered by body part and search text, for picking
+  // a superset partner that isn't on the day yet.
+  _dbPartnerList(f) {
+    const pk = f.pickPartner || {};
+    const q = (pk.q || '').trim().toLowerCase();
+    const parts = pk.cat ? BODY_PARTS.filter(b => b.key === pk.cat) : BODY_PARTS;
+    const seen = {}; const out = [];
+    parts.forEach(b => (this.state.exerciseDb[b.key] || []).forEach(x => {
+      if (!x || !x.name || seen[x.name] || x.name === f.name) return;
+      if (q && x.name.toLowerCase().indexOf(q) < 0) return;
+      seen[x.name] = true; out.push({ name: x.name, part: b.label });
+    }));
+    return out.slice(0, 40);
+  }
+
   // #56 — the other exercises on the same day, which a superset can be paired with.
   _supersetChoices(f) {
     if (!f || f.cardio) return [];
@@ -1078,23 +1221,40 @@ export default class App extends React.Component {
         if (!lg.length) return;
         const last = lg[lg.length - 1];
         const key = (r.date || '') + '|' + String(last.ts || 0).padStart(16, '0');
-        if (!best || key > best.key) best = { key, weight: last.weight, reps: last.reps, date: r.date };
+        if (!best || key > best.key) best = { key, weight: last.weight, reps: last.reps, secs: last.secs, date: r.date };
       });
     });
     return best;
   }
   // What the set logger should open with: this session's own last set first, then the
   // last time this exercise was lifted at all, then the planned target.
+  // Timed holds prefill `secs` (the reps field is unused for them).
   _prefill(e) {
-    if (!e) return { reps: '0', weight: '0' };
+    if (!e) return { reps: '0', weight: '0', secs: '0' };
+    const hold = String(e.holdSecs || 30);
     const last = (e.logged || []).filter(l => !l.skipped).slice(-1)[0];
-    if (last) return { reps: String(last.reps), weight: String(last.weight) };
+    if (last) return { reps: String(last.reps != null ? last.reps : (e.reps || 0)), weight: String(last.weight || 0), secs: String(last.secs != null ? last.secs : hold) };
     const lu = this.lastUsedFor(e.name);
-    if (lu) return { reps: String(lu.reps != null ? lu.reps : (e.reps || 0)), weight: String(lu.weight) };
-    return { reps: String(e.reps || 0), weight: String(e.weight || 0) };
+    if (lu) return { reps: String(lu.reps != null ? lu.reps : (e.reps || 0)), weight: String(lu.weight || 0), secs: String(lu.secs != null ? lu.secs : hold) };
+    return { reps: String(e.reps || 0), weight: String(e.weight || 0), secs: hold };
   }
 
-  _nextPos(exs) { for (let i = 0; i < exs.length; i++) { const e = exs[i]; if (e.cardio) continue; if ((e.logged || []).length < (e.sets || 0)) return { exIdx: i, setIdx: (e.logged || []).length }; } return null; }
+  // The next set owed. Inside a superset it is the member furthest behind in the current
+  // round, so resuming mid-round lands on the partner rather than starting a new round.
+  _nextPos(exs) {
+    for (let i = 0; i < exs.length; i++) {
+      const e = exs[i]; if (e.cardio) continue;
+      if ((e.logged || []).length < (e.sets || 0)) {
+        let best = i;
+        this._supersetGroup(exs, i).forEach(j => {
+          const x = exs[j]; const n = (x.logged || []).length;
+          if (n < (x.sets || 0) && n < (exs[best].logged || []).length) best = j;
+        });
+        return { exIdx: best, setIdx: (exs[best].logged || []).length };
+      }
+    }
+    return null;
+  }
   startWorkout() {
     const ad = this.state.activeDay; const slot = this.state.activeSlot || 'a';
     const sess0 = ad && this.slotSession(ad, slot); if (!sess0) return;
@@ -1107,9 +1267,10 @@ export default class App extends React.Component {
     if (!exs.some(e => !e.cardio && (e.sets || 0) > 0)) { this.showToast('Add a lift exercise first.'); return; }
     const pos = this._nextPos(exs);
     this.haptic(true);
+    this._woUnlockAudio();
     let workout;
     if (!pos) workout = { day: ad, slot, phase: 'summary' };
-    else { const pf = this._prefill(exs[pos.exIdx]); workout = { day: ad, slot, exIdx: pos.exIdx, setIdx: pos.setIdx, phase: 'set', reps: pf.reps, weight: pf.weight, editSet: null }; }
+    else { const pf = this._prefill(exs[pos.exIdx]); workout = { day: ad, slot, exIdx: pos.exIdx, setIdx: pos.setIdx, phase: 'set', reps: pf.reps, weight: pf.weight, secs: pf.secs, editSet: null }; }
     this.setState({ workout, workoutIdle: false });
     this._woWake(); this._woIdleReset();
     if (!this._woTick) this._woTick = setInterval(() => this._woOnTick(), 1000);
@@ -1133,20 +1294,94 @@ export default class App extends React.Component {
   _woRestDone() {
     const w = this.state.workout; if (!w || w.phase !== 'rest') return;
     const cfg = this.state.wcfg || W_DEFAULTS;
-    if (cfg.vibrate) { try { navigator.vibrate && navigator.vibrate([90, 60, 90]); } catch (e) {} }
+    if (cfg.vibrate) this._woVibrate();
     this._woSound();
     this.setState({ workout: { ...w, phase: 'ready', editSet: null }, workoutIdle: false });
     this._woIdleReset();
   }
+  _woVibrate() { try { if (navigator.vibrate) navigator.vibrate([90, 60, 90]); } catch (e) {} }
+
+  // ---- rest-timer chime (#12) ----
+  // The chime is synthesised — there is no audio file to resolve. It used to be created
+  // lazily when the timer ran out, which is never inside a user gesture, so browsers kept
+  // the AudioContext suspended and nothing played. Now every Start / Log tap unlocks
+  // audio ahead of time: it resumes the AudioContext and primes an <audio> element with a
+  // silent play. The chime itself goes through that <audio> element first (a generated
+  // WAV — media playback, which iOS doesn't route through the silent switch the way it
+  // does Web Audio) and falls back to the oscillators if the element is refused.
+  _woUnlockAudio() {
+    try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (e) {}
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (AC) {
+        const ctx = this._actx || (this._actx = new AC());
+        if (ctx.state === 'suspended') ctx.resume().catch(err => console.warn('[cadence] audio unlock: resume failed', err));
+      }
+    } catch (e) { console.warn('[cadence] audio unlock failed', e); }
+    if (this._chimeUnlocked) return;
+    try {
+      const el = this._chimeEl || (this._chimeEl = new Audio());
+      el.muted = true; el.src = this._chimeUrl('silent');
+      const p = el.play();
+      const done = () => { el.pause(); el.muted = false; this._chimeUnlocked = true; };
+      if (p && p.then) p.then(done).catch(err => { el.muted = false; console.warn('[cadence] audio unlock: priming play() rejected', err); });
+      else done();
+    } catch (e) { console.warn('[cadence] audio unlock failed', e); }
+  }
+
+  // A short mono 16-bit WAV for each sound, built once and kept as a blob URL.
+  _chimeUrl(type) {
+    this._chimes = this._chimes || {};
+    if (this._chimes[type]) return this._chimes[type];
+    const rate = 22050;
+    const tones = type === 'beep' ? [[660, 0, .16, .3, true], [660, .26, .16, .3, true]]
+      : (type === 'silent' ? [] : [[880, 0, .5, .4], [1174.66, .16, .6, .4]]);
+    const len = Math.ceil(rate * (type === 'silent' ? .1 : (type === 'beep' ? .5 : .85)));
+    const data = new Float32Array(len);
+    tones.forEach(([f, at, dur, amp, square]) => {
+      const s0 = Math.floor(at * rate), n = Math.floor(dur * rate);
+      for (let i = 0; i < n && s0 + i < len; i++) {
+        const t = i / rate;
+        const env = Math.min(1, t / .02) * Math.exp(-5 * t / dur);
+        const ph = Math.sin(2 * Math.PI * f * t);
+        data[s0 + i] += amp * env * (square ? Math.sign(ph) : ph);
+      }
+    });
+    const buf = new ArrayBuffer(44 + len * 2), dv = new DataView(buf);
+    const str = (o, x) => { for (let i = 0; i < x.length; i++) dv.setUint8(o + i, x.charCodeAt(i)); };
+    str(0, 'RIFF'); dv.setUint32(4, 36 + len * 2, true); str(8, 'WAVE'); str(12, 'fmt ');
+    dv.setUint32(16, 16, true); dv.setUint16(20, 1, true); dv.setUint16(22, 1, true);
+    dv.setUint32(24, rate, true); dv.setUint32(28, rate * 2, true); dv.setUint16(32, 2, true); dv.setUint16(34, 16, true);
+    str(36, 'data'); dv.setUint32(40, len * 2, true);
+    for (let i = 0; i < len; i++) dv.setInt16(44 + i * 2, Math.max(-1, Math.min(1, data[i])) * 32767, true);
+    this._chimes[type] = URL.createObjectURL(new Blob([buf], { type: 'audio/wav' }));
+    return this._chimes[type];
+  }
+
   _woSound(type) {
     const t = type || (this.state.wcfg || W_DEFAULTS).sound;
     if (!t || t === 'silent') return;
+    const viaWebAudio = () => {
+      try {
+        const ctx = this._actx || (this._actx = new (window.AudioContext || window.webkitAudioContext)());
+        if (ctx.state === 'suspended') ctx.resume().catch(err => console.warn('[cadence] rest chime: AudioContext resume rejected', err));
+        const mk = (f, at, dur) => { const o = ctx.createOscillator(), g = ctx.createGain(); o.type = t === 'beep' ? 'square' : 'sine'; o.frequency.value = f; const t0 = ctx.currentTime + at; g.gain.setValueAtTime(.0001, t0); g.gain.exponentialRampToValueAtTime(t === 'beep' ? .12 : .2, t0 + .02); g.gain.exponentialRampToValueAtTime(.0001, t0 + dur); o.connect(g); g.connect(ctx.destination); o.start(t0); o.stop(t0 + dur + .05); };
+        if (t === 'beep') { mk(660, 0, .16); mk(660, .26, .16); } else { mk(880, 0, .5); mk(1174.66, .16, .6); }
+      } catch (e) {
+        // No way to make a sound at all — at least buzz where the device can.
+        console.warn('[cadence] rest chime: Web Audio unavailable', e);
+        this._woVibrate();
+      }
+    };
     try {
-      const ctx = this._actx || (this._actx = new (window.AudioContext || window.webkitAudioContext)());
-      if (ctx.state === 'suspended') ctx.resume();
-      const mk = (f, at, dur) => { const o = ctx.createOscillator(), g = ctx.createGain(); o.type = t === 'beep' ? 'square' : 'sine'; o.frequency.value = f; const t0 = ctx.currentTime + at; g.gain.setValueAtTime(.0001, t0); g.gain.exponentialRampToValueAtTime(t === 'beep' ? .12 : .2, t0 + .02); g.gain.exponentialRampToValueAtTime(.0001, t0 + dur); o.connect(g); g.connect(ctx.destination); o.start(t0); o.stop(t0 + dur + .05); };
-      if (t === 'beep') { mk(660, 0, .16); mk(660, .26, .16); } else { mk(880, 0, .5); mk(1174.66, .16, .6); }
-    } catch (e) {}
+      const el = this._chimeEl || (this._chimeEl = new Audio());
+      el.muted = false; el.src = this._chimeUrl(t);
+      const p = el.play();
+      if (p && p.catch) p.catch(err => { console.warn('[cadence] rest chime: <audio> play() rejected, falling back to Web Audio', err); viaWebAudio(); });
+    } catch (e) {
+      console.warn('[cadence] rest chime: <audio> failed, falling back to Web Audio', e);
+      viaWebAudio();
+    }
   }
   _mkHold(field, delta) {
     return (ev) => {
@@ -1163,8 +1398,9 @@ export default class App extends React.Component {
     this.setState(s => {
       const w = s.workout; if (!w) return null;
       const useEdit = !!w.editSet; const obj = useEdit ? w.editSet : w;
-      const cur = parseFloat(obj[field]); const base = isNaN(cur) ? 0 : cur;
-      const max = field.toLowerCase().indexOf('reps') >= 0 ? 100 : 500;
+      const isSecs = field.toLowerCase().indexOf('secs') >= 0;
+      const cur = isSecs ? parseSecs(obj[field]) : parseFloat(obj[field]); const base = isNaN(cur) ? 0 : cur;
+      const max = isSecs ? 3600 : (field.toLowerCase().indexOf('reps') >= 0 ? 100 : 500);
       const v = Math.min(max, Math.max(0, Math.round((base + delta) * 100) / 100));
       const patch = { [field]: String(v) };
       return { workout: useEdit ? { ...w, editSet: { ...w.editSet, ...patch } } : { ...w, ...patch } };
@@ -1184,18 +1420,25 @@ export default class App extends React.Component {
     const sess = this.slotSession(w.day, slot); if (!sess) { this.endWorkout(); return; }
     const exs = (sess.exercises || []).map(x => ({ ...x }));
     const e = exs[w.exIdx]; if (!e) { this.endWorkout(); return; }
-    const reps = parseFloat(w.reps), weight = parseFloat(w.weight);
+    this._woUnlockAudio();
+    const timed = isTimed(e);
+    const reps = parseFloat(w.reps), weight = parseFloat(w.weight), secs = parseSecs(w.secs);
     if (!skipped) {
-      if (!(reps > 0 && reps <= 100)) { this.showToast('Reps must be between 0.5 and 100.'); return; }
+      if (timed && !(secs > 0 && secs <= 3600)) { this.showToast('Hold time must be between 1 second and 60 minutes.'); return; }
+      if (!timed && !(reps > 0 && reps <= 100)) { this.showToast('Reps must be between 0.5 and 100.'); return; }
       if (!(weight >= 0 && weight <= 500)) { this.showToast('Weight must be between 0 and 500 kg.'); return; }
     }
-    const entry = skipped ? { set: w.setIdx + 1, skipped: true, ts: Date.now() } : { set: w.setIdx + 1, reps, weight, ts: Date.now() };
+    // A bodyweight set is stamped with the body weight it was done at, so its volume
+    // doesn't drift as later weigh-ins come in.
+    const entry = skipped ? { set: w.setIdx + 1, skipped: true, ts: Date.now() }
+      : (timed ? { set: w.setIdx + 1, secs, weight, ts: Date.now() }
+        : { set: w.setIdx + 1, reps, weight, ...(isBodyweight(e) ? { bw: this.bodyweightKg() } : {}), ts: Date.now() });
     const logged = (e.logged || []).concat([entry]);
     exs[w.exIdx] = { ...e, logged };
     this.haptic(!skipped);
     this.save({ sessions: this.patchSlot(w.day, slot, { exercises: exs }) }, skipped ? 'skipping that set' : 'that logged set');
     // #56 — a dropset is logged straight after the working set it hangs off.
-    if (!skipped && e.dropset && e.dropset.pct) {
+    if (!skipped && !timed && e.dropset && e.dropset.pct) {
       const dw = Math.max(0, Math.round(weight * (e.dropset.pct / 100) * 2) / 2);
       this.setState({ workout: { ...w, phase: 'drop', dropIdx: logged.length - 1, dropReps: String(reps), dropWeight: String(dw), editSet: null } });
       return;
@@ -1203,35 +1446,53 @@ export default class App extends React.Component {
     this._woAfterSet(exs, w, skipped);
   }
 
-  // #56 — the exercise this one is supersetted with, if it is still on the day.
-  _supersetPartnerIdx(exs, i) {
-    const e = exs[i]; if (!e || !e.supersetWith) return null;
-    const j = exs.findIndex((x, k) => k !== i && !x.cardio && x.name === e.supersetWith);
-    return j < 0 ? null : j;
+  // #56 — every exercise linked to exs[i] through `supersetWith`, in either direction, in
+  // day order ([i] alone when it isn't in a superset). Following only the direction the
+  // pairing was saved from left the other half of the pair resting before its partner.
+  _supersetGroup(exs, i) {
+    const e = exs[i]; if (!e || e.cardio) return [i];
+    const seen = new Set([i]); const queue = [i];
+    while (queue.length) {
+      const x = exs[queue.shift()];
+      exs.forEach((y, j) => {
+        if (seen.has(j) || !y || y.cardio) return;
+        if ((x.supersetWith && y.name === x.supersetWith) || (y.supersetWith && y.supersetWith === x.name)) { seen.add(j); queue.push(j); }
+      });
+    }
+    return Array.from(seen).sort((a, b) => a - b);
   }
 
-  // Where the workout goes once a set (and its dropset) is in the book: into the
-  // superset partner with no rest, on to the next set, or to the summary.
+  // Where the workout goes once a set (and its dropset) is in the book. A superset is
+  // worked in rounds: each member's set follows straight on from the previous member's
+  // with no rest, and the rest timer only runs once the last member of the round is
+  // logged — then the next round starts back on the first member still owed a set. An
+  // exercise outside a superset is simply a round of one.
   _woAfterSet(exs, w, skipped) {
     const slot = w.slot || 'a';
     const cfg = this.state.wcfg || W_DEFAULTS;
     const e = exs[w.exIdx]; if (!e) { this.endWorkout(); return; }
-    const logged = e.logged || [];
-    const pIdx = w.superFrom == null ? this._supersetPartnerIdx(exs, w.exIdx) : null;
-    const partner = pIdx != null ? exs[pIdx] : null;
-    const partnerLogged = partner ? (partner.logged || []).length : 0;
+    const done = (x) => (x.logged || []).length;
+    const owed = (x) => done(x) < (x.sets || 0);
+    const group = this._supersetGroup(exs, w.exIdx);
+    const round = done(e);
+    const partnerIdx = group.slice(group.indexOf(w.exIdx) + 1).find(j => owed(exs[j]) && done(exs[j]) < round);
+    const go = (idx, phase) => {
+      const pf = this._prefill(exs[idx]);
+      return { day: w.day, slot, exIdx: idx, setIdx: done(exs[idx]), phase, reps: pf.reps, weight: pf.weight, secs: pf.secs, editSet: null };
+    };
     let workout;
-    if (!skipped && partner && partnerLogged < (partner.sets || 0) && partnerLogged < logged.length) {
-      const pf = this._prefill(partner);
-      workout = { day: w.day, slot, exIdx: pIdx, setIdx: partnerLogged, phase: 'set', reps: pf.reps, weight: pf.weight, editSet: null, superFrom: w.exIdx };
-    } else if (logged.length < (e.sets || 0)) {
-      workout = skipped
-        ? { ...w, phase: 'set', setIdx: w.setIdx + 1, editSet: null, superFrom: null, dropIdx: null }
-        : { ...w, phase: 'rest', setIdx: w.setIdx + 1, restLeft: cfg.rest, restTotal: cfg.rest, paused: false, editSet: null, restStart: Date.now(), superFrom: null, dropIdx: null };
+    if (partnerIdx != null) {
+      workout = { ...go(partnerIdx, 'set'), superFrom: w.exIdx };
     } else {
-      const pos = this._nextPos(exs);
-      if (pos) { const pf = this._prefill(exs[pos.exIdx]); workout = { day: w.day, slot, exIdx: pos.exIdx, setIdx: pos.setIdx, phase: 'set', reps: pf.reps, weight: pf.weight, editSet: null }; }
-      else workout = { day: w.day, slot, phase: 'summary' };
+      const nextIdx = group.find(j => owed(exs[j]));
+      if (nextIdx != null) {
+        // A skipped set has nothing to recover from, so it goes straight on.
+        workout = skipped ? go(nextIdx, 'set')
+          : { ...go(nextIdx, 'rest'), restLeft: cfg.rest, restTotal: cfg.rest, paused: false, restStart: Date.now(), restOn: w.exIdx };
+      } else {
+        const pos = this._nextPos(exs);
+        workout = pos ? go(pos.exIdx, 'set') : { day: w.day, slot, phase: 'summary' };
+      }
     }
     this.setState({ workout });
   }
@@ -1260,30 +1521,38 @@ export default class App extends React.Component {
     const sess = this.slotSession(w.day, slot); if (!sess) { this.endWorkout(); return; }
     const exs = (sess.exercises || []).map(x => ({ ...x }));
     const e = exs[w.exIdx]; if (!e) { this.endWorkout(); return; }
-    if (w.restStart) {
-      const lg = (e.logged || []).slice(); const li = lg.length - 1;
+    this._woUnlockAudio();
+    // The rest belongs to the set it followed — in a superset that is the last member of
+    // the round, not the exercise coming up next.
+    const ri = w.restOn != null ? w.restOn : w.exIdx;
+    const re = exs[ri];
+    if (w.restStart && re) {
+      const lg = (re.logged || []).slice(); const li = lg.length - 1;
       if (li >= 0 && lg[li].restAfter == null) {
         lg[li] = { ...lg[li], restAfter: Math.round((Date.now() - w.restStart) / 1000) };
-        exs[w.exIdx] = { ...e, logged: lg };
+        exs[ri] = { ...re, logged: lg };
         this.save({ sessions: this.patchSlot(w.day, slot, { exercises: exs }) }, null);
       }
     }
     const pf = this._prefill(e);
     this.haptic(false);
-    this.setState({ workout: { day: w.day, slot, exIdx: w.exIdx, setIdx: w.setIdx, phase: 'set', reps: pf.reps, weight: pf.weight, editSet: null } });
+    this.setState({ workout: { day: w.day, slot, exIdx: w.exIdx, setIdx: w.setIdx, phase: 'set', reps: pf.reps, weight: pf.weight, secs: pf.secs, editSet: null } });
   }
   _woEditSave() {
     const w = this.state.workout; if (!w || !w.editSet) return;
     const es = w.editSet;
     const xi = es.exIdx != null ? es.exIdx : w.exIdx;
-    const reps = parseFloat(es.reps), weight = parseFloat(es.weight);
-    if (!(reps > 0 && reps <= 100)) { this.showToast('Reps must be between 0.5 and 100.'); return; }
-    if (!(weight >= 0 && weight <= 500)) { this.showToast('Weight must be between 0 and 500 kg.'); return; }
     const slot = w.slot || 'a';
     const sess = this.slotSession(w.day, slot); if (!sess) return;
     const exs = (sess.exercises || []).map(x => ({ ...x }));
-    const e = exs[xi]; if (!e) return; const lg = (e.logged || []).slice();
-    if (lg[es.idx]) lg[es.idx] = { ...lg[es.idx], reps, weight };
+    const e = exs[xi]; if (!e) return;
+    const timed = isTimed(e);
+    const reps = parseFloat(es.reps), weight = parseFloat(es.weight), secs = parseSecs(es.secs);
+    if (timed && !(secs > 0 && secs <= 3600)) { this.showToast('Hold time must be between 1 second and 60 minutes.'); return; }
+    if (!timed && !(reps > 0 && reps <= 100)) { this.showToast('Reps must be between 0.5 and 100.'); return; }
+    if (!(weight >= 0 && weight <= 500)) { this.showToast('Weight must be between 0 and 500 kg.'); return; }
+    const lg = (e.logged || []).slice();
+    if (lg[es.idx]) lg[es.idx] = timed ? { ...lg[es.idx], secs, weight } : { ...lg[es.idx], reps, weight };
     exs[xi] = { ...e, logged: lg };
     this.haptic(false);
     this.setState({ workout: { ...w, editSet: null } });
@@ -1306,7 +1575,7 @@ export default class App extends React.Component {
     exs[xi] = { ...e, logged: lg };
     this.haptic(false);
     const setIdx = removed.set != null ? removed.set - 1 : lg.length;
-    this.setState({ workout: { day: w.day, slot, exIdx: xi, setIdx, phase: 'set', reps: String(removed.reps != null ? removed.reps : (e.reps || 0)), weight: String(removed.weight != null ? removed.weight : (e.weight || 0)), editSet: null } });
+    this.setState({ workout: { day: w.day, slot, exIdx: xi, setIdx, phase: 'set', reps: String(removed.reps != null ? removed.reps : (e.reps || 0)), weight: String(removed.weight != null ? removed.weight : (e.weight || 0)), secs: String(removed.secs != null ? removed.secs : (e.holdSecs || 30)), editSet: null } });
     this.save({ sessions: this.patchSlot(w.day, slot, { exercises: exs }) }, 'dropping that set');
     this._woIdleReset();
   }
@@ -1337,7 +1606,7 @@ export default class App extends React.Component {
       const pf = pos ? this._prefill(exs[pos.exIdx]) : null;
       this.setState({
         workout: pos
-          ? { day, slot: sl, exIdx: pos.exIdx, setIdx: pos.setIdx, phase: 'set', reps: pf.reps, weight: pf.weight, editSet: null }
+          ? { day, slot: sl, exIdx: pos.exIdx, setIdx: pos.setIdx, phase: 'set', reps: pf.reps, weight: pf.weight, secs: pf.secs, editSet: null }
           : { day, slot: sl, phase: 'summary' },
         workoutIdle: false,
       });
@@ -1370,7 +1639,7 @@ export default class App extends React.Component {
     this.setState({ flowPhase: 'done', tutRect: null, tutStep: 0 });
     this.save({ tutorialDone: true }, null);
     try { localStorage.setItem('cadenceTutorialComplete', 'true'); localStorage.setItem('lt_tut_step', '0'); } catch (e) {}
-    if (skipped) this.showToast('You can re-run tutorial in Menu → Help');
+    if (skipped) this.showToast('You can replay the tutorial from Menu → Replay Tutorial.');
   }
 
   _tutMeasureSoon(delay) {
@@ -1394,6 +1663,11 @@ export default class App extends React.Component {
     if (phone && step && step.target) {
       const el = phone.querySelector('[data-tut="' + step.target + '"]');
       if (el) {
+        // Targets further down the home screen (weight, supplements, macros) start below
+        // the fold — bring them into view first, or the spotlight lands off-screen.
+        const p0 = phone.getBoundingClientRect(), r0 = el.getBoundingClientRect();
+        const sc = el.closest('[data-lt-scroll]');
+        if (sc && (r0.top < sc.getBoundingClientRect().top || r0.bottom > p0.bottom - 40)) { try { el.scrollIntoView({ block: 'center', behavior: 'auto' }); } catch (e) {} }
         const p = phone.getBoundingClientRect(), r = el.getBoundingClientRect();
         rect = { top: Math.round(r.top - p.top) - 6, left: Math.round(r.left - p.left) - 6, width: Math.round(r.width) + 12, height: Math.round(r.height) + 12 };
       }
@@ -1901,22 +2175,25 @@ export default class App extends React.Component {
   // One report shape for both an archived program and the current one.
   buildProgramReport(meta) {
     const cl = this.state.customLabels || {};
-    const sessions = (meta.sessions || []).slice().sort((a, b) => ((a.date || '') < (b.date || '') ? -1 : 1));
+    // Completed days only (#8) — the same set the Archive screen lists.
+    const sessions = (meta.sessions || []).filter(se => this.recordCompleted(se)).sort((a, b) => ((a.date || '') < (b.date || '') ? -1 : 1));
     const dated = sessions.filter(se => !!se.date);
     const startDate = meta.startDate || (dated.length ? dated[0].date : '');
     const endDate = meta.endDate || (dated.length ? dated[dated.length - 1].date : '');
-    let totalVol = 0, rpeSum = 0, rpeN = 0;
+    let totalVol = 0, rpeSum = 0, rpeN = 0, cardioKm = 0, cardioMin = 0, cardioRpeSum = 0, cardioN = 0, holdSecs = 0;
     const weeks = {}, firstSeen = {}, lastSeen = {}, loggedDates = {};
     const days = sessions.map(se => {
       let vol = 0;
       const exercises = (se.exercises || []).map(e => {
-        const v = exVol(e); vol += v;
+        const v = this.exVol(e); vol += v;
         const tw = topWeight(e);
-        if (!e.cardio && tw > 0) {
+        if (!e.cardio && !isTimed(e) && tw > 0) {
           if (!firstSeen[e.name]) firstSeen[e.name] = { date: se.date || '', w: tw };
           lastSeen[e.name] = { date: se.date || '', w: tw };
         }
-        return { name: e.name, detail: loggedLine(e), volume: e.cardio ? '—' : fmt(v) };
+        if (e.cardio) { cardioKm += +e.distance || 0; cardioMin += +e.duration || 0; cardioRpeSum += cardioRpe(e); cardioN++; }
+        const held = exHoldSecs(e); holdSecs += held;
+        return { name: e.name, detail: loggedLine(e), volume: e.cardio ? '—' : (isTimed(e) ? fmtSecs(held) : fmt(v)) };
       });
       totalVol += vol;
       if (se.rpe != null) { rpeSum += se.rpe; rpeN++; }
@@ -1926,11 +2203,12 @@ export default class App extends React.Component {
         weeks[k] = weeks[k] || { vol: 0, count: 0 };
         weeks[k].vol += vol; weeks[k].count++;
       }
+      const cardioOnly = (se.exercises || []).length > 0 && se.exercises.every(e => e.cardio);
       return {
         dateLabel: se.date ? fmtDate(se.date) : 'Undated',
         title: this.recordTitle(se),
         rpe: se.rpe != null ? ('RPE ' + se.rpe + '/10') : '',
-        notes: se.notes || '', volume: fmt(vol), exercises,
+        notes: se.notes || '', volume: cardioOnly ? (se.exercises.reduce((a, e) => a + (+e.duration || 0), 0) + ' min') : fmt(vol), exercises,
       };
     });
     const weekRows = Object.keys(weeks).sort().map(k => ({
@@ -1961,8 +2239,9 @@ export default class App extends React.Component {
         { label: 'Days completed', value: completed + ' of ' + span },
         { label: 'Rest days', value: String(Math.max(0, span - completed)) },
         { label: 'Average RPE', value: rpeN ? ((Math.round((rpeSum / rpeN) * 10) / 10) + '/10 · ' + rpeN + ' rated') : 'Not rated' },
-      ],
-      planDays: (meta.days || []).filter(d => (d.exercises || []).length).map(d => ({
+      ].concat(cardioN ? [{ label: 'Cardio', value: (cardioKm ? (Math.round(cardioKm * 10) / 10) + ' km · ' : '') + cardioMin + ' min · avg RPE ' + (Math.round((cardioRpeSum / cardioN) * 10) / 10) }] : [])
+        .concat(holdSecs ? [{ label: 'Time in holds', value: fmtSecs(holdSecs) }] : []),
+      planDays: (meta.days || []).filter(d => (d.exercises || []).length && d.type !== 'Rest' && (!meta.onlyDone || sessions.some(se => se.day === d.day))).map(d => ({
         title: FULL[d.day] + ' · ' + dayTypeName(d.type, d.day, cl, false, d.label),
         exercises: (d.exercises || []).map(e => ({ name: e.name, scheme: scheme(e) })),
       })),
@@ -1984,12 +2263,24 @@ export default class App extends React.Component {
     if (id) {
       const a = (s.archive || []).find(w => w.id === id);
       if (!a) return;
-      meta = { name: a.name, startDate: a.startDate, endDate: a.endDate, sessions: a.sessions, days: a.days, status: 'Archived' };
+      meta = { name: a.name, startDate: a.startDate, endDate: a.endDate, sessions: a.sessions, days: a.days, status: 'Archived', onlyDone: true };
     } else {
       meta = { name: s.programName || 'Current program', startDate: s.programStartDate, endDate: this.todayISO(), sessions: s.sessionHistory || [], days: this.programSnapshot(), status: 'Current program' };
     }
     this.setState({ menuOpen: false });
-    this._printReport('programPrint', this.buildProgramReport(meta));
+    // #9 — this used to mount the report and call window.print(), which an installed iOS
+    // PWA silently ignores (no dialog, no error), so the button looked dead. A real PDF
+    // file is generated and handed over instead; any failure is logged and surfaced.
+    const report = this.buildProgramReport(meta);
+    const slug = (report.name || 'program').replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '-').toLowerCase() || 'program';
+    const file = 'cadence-' + slug + '-' + this.todayISO() + '.pdf';
+    return downloadProgramPdf(report, file)
+      .then(how => { if (how !== 'cancelled') this.showToast(how === 'shared' ? 'PDF ready — save it to Files or share it.' : 'PDF downloaded: ' + file); return how; })
+      .catch(e => {
+        console.error('[cadence] PDF export failed', e);
+        this.showToast("Couldn't create the PDF" + (e && e.message ? ' — ' + e.message : '') + '.');
+        return 'failed';
+      });
   }
 
   // Mount a report into the hidden print area, let it paint, print, then drop it.
@@ -2008,7 +2299,7 @@ export default class App extends React.Component {
 
   weekVolume(sessions) {
     let v = 0;
-    Object.keys(sessions || {}).forEach(d => { (sessions[d].exercises || []).forEach(e => { v += exVol(e); }); });
+    Object.keys(sessions || {}).forEach(d => { (sessions[d].exercises || []).forEach(e => { v += this.exVol(e); }); });
     return v;
   }
 
@@ -2211,12 +2502,13 @@ export default class App extends React.Component {
     let sessions = this.state.sessions;
     if (r.cardio && r.cardio.length) {
       const exs = (history[idx].exercises || []).map(x => ({ ...x }));
-      r.cardio.forEach(c => { if (exs[c.idx]) exs[c.idx] = { ...exs[c.idx], duration: c.duration || 0, intensity: c.intensity }; });
+      const cardioPatch = (c) => ({ duration: +c.duration || 0, distance: +c.distance || 0, rpe: c.rpe || 5, intensity: rpeIntensity(c.rpe || 5) });
+      r.cardio.forEach(c => { if (exs[c.idx]) exs[c.idx] = { ...exs[c.idx], ...cardioPatch(c) }; });
       history[idx] = { ...history[idx], exercises: exs };
       const live = this.slotSession(r.day, r.slot || 'a');
       if (live) {
         const lexs = (live.exercises || []).map(x => ({ ...x }));
-        r.cardio.forEach(c => { if (lexs[c.idx]) lexs[c.idx] = { ...lexs[c.idx], duration: c.duration || 0, intensity: c.intensity }; });
+        r.cardio.forEach(c => { if (lexs[c.idx]) lexs[c.idx] = { ...lexs[c.idx], ...cardioPatch(c) }; });
         sessions = this.patchSlot(r.day, r.slot || 'a', { exercises: lexs });
       }
     }
@@ -2390,7 +2682,7 @@ export default class App extends React.Component {
     let sx = null;
     if (asess) {
       const exs = asess.exercises || [];
-      const total = exs.reduce((a, e) => a + exVol(e), 0);
+      const total = exs.reduce((a, e) => a + this.exVol(e), 0);
       // Sets logged for THIS week only — see freshSession(). A session is "in progress"
       // (so: resumable, and restartable) only when this week put sets in it.
       const aLogged = this.loggedSetCount(asess);
@@ -2428,7 +2720,7 @@ export default class App extends React.Component {
           const startFrom = (clientY, ev) => { const rect = ev.currentTarget.closest('[data-sess-card]').getBoundingClientRect(); this._startSessDrag(clientY, idx, rect.height + 10); };
           const exNotes = exerciseNotes(e);
           return {
-            name: e.name, scheme: scheme(e) + (!e.cardio && (e.logged || []).length ? ' · ' + Math.min((e.logged || []).length, e.sets || 0) + '/' + (e.sets || 0) + ' logged' : ''), volume: e.cardio ? ((e.duration || 0) + 'm') : fmt(exVol(e)), volLabel: e.cardio ? 'cardio' : 'volume',
+            name: e.name, scheme: scheme(e) + (!e.cardio && (e.logged || []).length ? ' · ' + Math.min((e.logged || []).length, e.sets || 0) + '/' + (e.sets || 0) + ' logged' : ''), volume: e.cardio ? ((e.duration || 0) + 'm') : (isTimed(e) ? fmtSecs(exHoldSecs(e)) : fmt(this.exVol(e))), volLabel: e.cardio ? 'cardio' : (isTimed(e) ? 'held' : 'volume'),
             notes: exNotes, hasNotes: !!exNotes,
             ty, z, scale, cardShadow, tyTransition,
             handleTouchStart: (ev) => { startFrom(ev.touches[0].clientY, ev); },
@@ -2441,7 +2733,7 @@ export default class App extends React.Component {
               const mu = () => { document.removeEventListener('mousemove', mm); document.removeEventListener('mouseup', mu); this._endSessDrag(); };
               document.addEventListener('mousemove', mm); document.addEventListener('mouseup', mu);
             },
-            edit: () => { if (s.sessDrag) return; this.setState({ exForm: { mode: 'session', day: ad, slot: aslot, index: idx, name: e.name, cardio: !!e.cardio, sets: e.sets, reps: e.reps, weight: e.weight, duration: e.duration, intensity: e.intensity, supersetWith: e.supersetWith || '', dropset: e.dropset || null } }); },
+            edit: () => { if (s.sessDrag) return; this.setState({ exForm: this._exFormFrom(e, { mode: 'session', day: ad, slot: aslot, index: idx }) }); },
           };
         }),
         exCount: exs.length,
@@ -2468,6 +2760,7 @@ export default class App extends React.Component {
       };
     }
 
+    if (screen === 'program') preloadPdf();
     // current program
     const programDays = DAYS.map((d, i) => {
       const p = s.program[d];
@@ -2575,7 +2868,7 @@ export default class App extends React.Component {
             edit: () => {
               if (inReorder) return;
               if (swActive && dx === -88) { this.setState({ swipe: null }); return; }
-              this.setState({ exForm: { mode: 'program', day: apd, index: idx, name: e.name, cardio: !!e.cardio, sets: e.sets, reps: e.reps, weight: e.weight, duration: e.duration, intensity: e.intensity, supersetWith: e.supersetWith || '', dropset: e.dropset || null } });
+              this.setState({ exForm: this._exFormFrom(e, { mode: 'program', day: apd, index: idx }) });
             },
             deleteNow: () => {
               const list = (p.exercises || []).filter((_, i) => i !== idx);
@@ -2589,7 +2882,8 @@ export default class App extends React.Component {
 
     // archive
     const archiveWeeks = (screen !== 'archive' ? [] : s.archive).map(w => {
-      let vol = 0; w.sessions.forEach(se => se.exercises.forEach(e => { vol += exVol(e); }));
+      const done = (w.sessions || []).filter(se => this.recordCompleted(se));
+      const vol = done.reduce((a, se) => a + this.recordVolume(se), 0);
       const asw = s.archiveSwipe;
       const active = asw && asw.id === w.id;
       const dx = active ? asw.dx : 0;
@@ -2603,7 +2897,7 @@ export default class App extends React.Component {
         exCount: exNames.length + (exNames.length === 1 ? ' exercise' : ' exercises'),
         exLine: exNames.slice(0, 3).join(' · ') + (exNames.length > 3 ? ' +' + (exNames.length - 3) + ' more' : ''),
         hasExercises: exNames.length > 0,
-        label: w.label, volume: fmt(vol), count: w.sessions.length, dx: dx + 'px',
+        label: w.label, volume: fmt(vol), count: done.length, dx: dx + 'px',
         onTouchStart: (ev) => { this._archiveSwipeStartX = ev.touches[0].clientX; this.setState({ archiveSwipe: { id: w.id, dx } }); },
         onTouchMove: (ev) => {
           if (this._archiveSwipeStartX == null) return;
@@ -2631,24 +2925,31 @@ export default class App extends React.Component {
     const arcEntry = screen === 'archiveDetail' ? s.archive.find(w => w.id === s.archiveId) : null;
     let adv = null;
     if (arcEntry) {
-      let tv = 0; arcEntry.sessions.forEach(se => se.exercises.forEach(e => { tv += exVol(e); }));
+      preloadPdf();
+      // Only completed days: a missed, unlogged or rest day isn't part of what the program
+      // amounted to, and listing it just shows a 0 kg row.
+      const arcDone = (arcEntry.sessions || []).filter(se => this.recordCompleted(se));
+      const doneDays = {}; arcDone.forEach(se => { doneDays[se.day] = true; });
+      const tv = arcDone.reduce((a, se) => a + this.recordVolume(se), 0);
       adv = {
         name: arcEntry.name || 'Program',
         range: (arcEntry.startDate && arcEntry.endDate) ? (fmtDate(arcEntry.startDate) + ' → ' + fmtDate(arcEntry.endDate)) : (arcEntry.label || ''),
-        dayGroups: (arcEntry.days || []).filter(d => (d.exercises || []).length).map(d => ({
+        dayGroups: (arcEntry.days || []).filter(d => (d.exercises || []).length && d.type !== 'Rest' && doneDays[d.day]).map(d => ({
           title: FULL[d.day] + ' · ' + dayTypeName(d.type, d.day, cl, false, d.label),
           exercises: (d.exercises || []).map((e, i) => ({ name: e.name, scheme: scheme(e), divider: i === d.exercises.length - 1 ? 'transparent' : 'var(--border)' })),
         })),
-        hasSessions: arcEntry.sessions.length > 0,
-        label: arcEntry.label, volume: fmt(tv), count: arcEntry.sessions.length,
-        sessions: arcEntry.sessions.map(se => {
-          let v = 0; se.exercises.forEach(e => { v += exVol(e); });
+        hasSessions: arcDone.length > 0, noSessions: arcDone.length === 0,
+        label: arcEntry.label, volume: fmt(tv), count: arcDone.length,
+        sessions: arcDone.map(se => {
+          se = { ...se, exercises: se.exercises || [] };
+          const v = this.recordVolume(se);
+          const cardioOnly = se.exercises.length > 0 && se.exercises.every(e => e.cardio);
           // What was actually performed — the sets as logged, including any the user
           // added or dropped that day — rather than the program's template scheme.
           const sets = se.exercises.reduce((a, e) => a + (e.logged || []).filter(l => !l.skipped).length, 0);
           return {
             title: this.recordTitle(se),
-            volume: fmt(v), hasDate: !!se.date,
+            volume: cardioOnly ? se.exercises.reduce((a, e) => a + (+e.duration || 0), 0) + ' min' : fmt(v), hasDate: !!se.date,
             dateLabel: (se.date ? fmtDate(se.date) : '') + (se.rpe != null ? ' · RPE ' + se.rpe + '/10' : '') + (sets ? ' · ' + sets + ' sets logged' : ''),
             hasNotes: !!se.notes, notes: se.notes || '',
             exercises: se.exercises.map((e, i) => ({
@@ -2664,7 +2965,13 @@ export default class App extends React.Component {
 
     // exercise form
     const ef0 = s.exForm;
-    const efPairs = ef0 ? this._supersetChoices(ef0) : [];
+    const efPairs0 = ef0 ? this._supersetChoices(ef0) : [];
+    // A partner picked from the database isn't on the day yet; keep it in the chip row.
+    const efPairs = (ef0 && ef0.supersetWith && efPairs0.indexOf(ef0.supersetWith) < 0) ? efPairs0.concat([ef0.supersetWith]) : efPairs0;
+    const setEf = (patch) => this.setState({ exForm: { ...this.state.exForm, ...patch } });
+    const efTimed = ef0 ? this._formTimed(ef0) : false;
+    const efBw = ef0 ? this._formBw(ef0) : false;
+    const efPick = ef0 && ef0.pickPartner;
     const ef = ef0 ? {
       heading: ef0.index === null ? 'Add exercise' : (ef0.cardio ? 'Edit cardio' : 'Edit exercise'),
       isCardio: !!ef0.cardio, isStrength: !ef0.cardio,
@@ -2672,23 +2979,73 @@ export default class App extends React.Component {
       name: ef0.name, sets: ef0.sets, reps: ef0.reps, weight: ef0.weight,
       duration: ef0.duration, intensity: ef0.intensity,
       intensities: INTENSITIES.map(x => ({ label: x, bg: ef0.intensity === x ? TYPE_COLOR.Cardio : 'var(--surface-2)', color: ef0.intensity === x ? '#fff' : 'var(--text)', pick: () => this.setState({ exForm: { ...this.state.exForm, intensity: x } }) })),
-      volume: fmt(exVol(ef0)),
+      volume: efTimed ? (fmtSecs((ef0.sets || 0) * (ef0.holdSecs || 0)) + ' held') : fmt(this.exVol(this._exItemFromForm(ef0))),
+      volumeLabel: efTimed ? 'Planned hold time' : 'Exercise volume',
       deleteDisplay: ef0.index === null ? 'none' : 'block',
+      // ---- #10 rep range ----
+      repRange: !!ef0.repRange,
+      toggleRange: () => { const f = this.state.exForm; if (!f) return; setEf(f.repRange ? { repRange: false, reps: f.repsMin || f.reps } : { repRange: true, repsMin: f.repsMin || f.reps || 6, repsMax: f.repsMax || Math.max(12, (+f.reps || 0) + 4) }); },
+      repsMin: ef0.repsMin, repsMax: ef0.repsMax,
+      onRepsMin: (e) => setEf({ repsMin: numOrEmpty(e.target.value) }),
+      onRepsMax: (e) => setEf({ repsMax: numOrEmpty(e.target.value) }),
+      rangeErr: (ef0.repRange && ef0.repsMin !== '' && ef0.repsMax !== '' && !(+ef0.repsMax > +ef0.repsMin)) ? 'Max must be higher than min.' : '',
+      // ---- #4 / #5 timed holds and bodyweight ----
+      timedOn: efTimed, notTimed: !efTimed,
+      toggleTimed: () => { const f = this.state.exForm; if (f) setEf({ timed: !this._formTimed(f) }); },
+      holdSecs: ef0.holdSecs, holdLabel: fmtSecs(ef0.holdSecs || 0),
+      onHoldSecs: (e) => { const v = e.target.value; setEf({ holdSecs: v === '' ? '' : (Number.isNaN(parseSecs(v)) ? this.state.exForm.holdSecs : parseSecs(v)) }); },
+      bwOn: efBw,
+      toggleBw: () => { const f = this.state.exForm; if (f) setEf({ bw: !this._formBw(f) }); },
+      weightLabel: efBw ? 'Added (kg)' : 'Weight (kg)',
+      bwNote: efBw ? ('Body weight ' + (this.bodyweightKg() ? this.bodyweightKg() + ' kg' : 'not logged yet') + ' counts as load; weight here is added on top.') : '',
+      // ---- #7 cardio ----
+      distance: ef0.distance,
+      onDistance: (e) => setEf({ distance: numOrEmpty(e.target.value, true) }),
+      efforts: this._effortChips(ef0.rpe, (n) => setEf({ rpe: n })),
+      effortLabel: 'Effort · RPE ' + (ef0.rpe || 5) + ' — ' + ((RPE_SCALE.find(r => r.n === (ef0.rpe || 5)) || {}).label || ''),
       browseDisplay: (ef0.mode === 'session' && ef0.index === null) ? 'inline-flex' : 'none',
-      onName: (e) => this.setState({ exForm: { ...s.exForm, name: e.target.value } }),
+      // A new exercise starts at 20 kg — unless the name makes it a bodyweight movement or
+      // a hold, where that 20 would read as added weight. Only until the weight is touched.
+      onName: (e) => {
+        const f = this.state.exForm; const name = e.target.value;
+        const patch = { name };
+        if (f.index === null && !f.weightTouched && !f.cardio) { const nf = { ...f, name }; patch.weight = (this._formBw(nf) || this._formTimed(nf)) ? 0 : 20; }
+        this.setState({ exForm: { ...f, ...patch } });
+      },
       onSets: (e) => this.setState({ exForm: { ...s.exForm, sets: numOrEmpty(e.target.value) } }),
       onReps: (e) => this.setState({ exForm: { ...s.exForm, reps: numOrEmpty(e.target.value) } }),
-      onWeight: (e) => this.setState({ exForm: { ...s.exForm, weight: numOrEmpty(e.target.value, true) } }),
+      onWeight: (e) => this.setState({ exForm: { ...s.exForm, weight: numOrEmpty(e.target.value, true), weightTouched: true } }),
       onDuration: (e) => this.setState({ exForm: { ...s.exForm, duration: numOrEmpty(e.target.value) } }),
       // ---- #56 superset / dropset ----
       supersetOn: !!ef0.supersetWith,
       supersetWith: ef0.supersetWith || '',
+      // With nothing else on the day to pair with, turning it on opens the database
+      // picker straight away rather than sending the user off to add a partner first.
       toggleSuperset: () => {
         const f = this.state.exForm; if (!f) return;
+        if (f.supersetWith || f.pickPartner) { setEf({ supersetWith: '', pickPartner: null }); return; }
         const opts = this._supersetChoices(f);
-        if (!f.supersetWith && !opts.length) { this.showToast('Add another exercise to this day first, then pair them.'); return; }
-        this.setState({ exForm: { ...f, supersetWith: f.supersetWith ? '' : opts[0] } });
+        setEf(opts.length ? { supersetWith: opts[0] } : { pickPartner: { cat: null, q: '' } });
       },
+      pickingPartner: !!efPick,
+      openPartnerDb: () => setEf({ pickPartner: { cat: null, q: '' } }),
+      closePartnerDb: () => setEf({ pickPartner: null }),
+      partnerQuery: efPick ? (efPick.q || '') : '',
+      onPartnerQuery: (e) => setEf({ pickPartner: { ...(this.state.exForm.pickPartner || {}), q: e.target.value } }),
+      partnerParts: efPick ? [{ key: null, label: 'All' }].concat(BODY_PARTS).map(b => ({
+        label: b.label,
+        bg: (efPick.cat || null) === b.key ? 'var(--accent)' : 'var(--surface-2)',
+        color: (efPick.cat || null) === b.key ? '#fff' : 'var(--text)',
+        pick: () => setEf({ pickPartner: { ...(this.state.exForm.pickPartner || {}), cat: b.key } }),
+      })) : [],
+      partnerList: efPick ? this._dbPartnerList(ef0).map((x, i, arr) => ({
+        name: x.name, part: x.part,
+        onDay: efPairs0.indexOf(x.name) >= 0,
+        divider: i === arr.length - 1 ? 'transparent' : 'var(--border)',
+        pick: () => setEf({ supersetWith: x.name, pickPartner: null }),
+      })) : [],
+      partnerEmpty: !!efPick && this._dbPartnerList(ef0).length === 0,
+      partnerAddNote: (ef0.supersetWith && efPairs0.indexOf(ef0.supersetWith) < 0) ? (ef0.supersetWith + ' will be added to this day as its superset partner.') : '',
       supersetChoices: efPairs.map(n => ({
         label: n,
         bg: ef0.supersetWith === n ? 'var(--accent)' : 'var(--surface-2)',
@@ -2718,7 +3075,7 @@ export default class App extends React.Component {
     const historyEntries = (screen !== 'history' ? [] : (s.sessionHistory || []).slice().sort((a, b) => (a.date < b.date ? 1 : -1)).map(h => ({
       title: this.recordTitle(h),
       dateLabel: fmtDate(h.date) + (h.rpe != null ? ' · RPE ' + h.rpe + '/10' : ''),
-      volume: fmt(h.volume),
+      volume: fmt(this.recordVolume(h)),
       // The sets as logged — a session that ran long or short reads as it happened.
       exercises: h.exercises.map((e, i) => ({ name: e.name, scheme: loggedLine(e), divider: i === h.exercises.length - 1 ? 'transparent' : 'var(--border)' })),
     })));
@@ -2788,9 +3145,10 @@ export default class App extends React.Component {
           const cardio = st.kind === 'cardio' || st.kind === 'sport';
           // #62 — a lift added from the database starts at whatever it was last lifted at.
           const lu = cardio ? null : this.lastUsedFor(st.item.name);
+          const qRpe = st.rpe || 5;
           const item = cardio
-            ? { name: st.item.name, duration: st.duration || 0, intensity: st.intensity }
-            : { name: st.item.name, sets: st.sets || 0, reps: st.reps || 0, weight: lu ? lu.weight : 0, equipment: st.item.equipment || '' };
+            ? { name: st.item.name, duration: st.duration || 0, distance: +st.distance || 0, rpe: qRpe, intensity: rpeIntensity(qRpe) }
+            : { name: st.item.name, sets: st.sets || 0, reps: st.reps || 0, weight: lu ? (lu.weight || 0) : 0, equipment: st.item.equipment || '' };
           // Adding into a day's second workout never touches the recurring template.
           if (st.slot === 'b') {
             const x = this.slotSession(st.day, 'b');
@@ -2845,7 +3203,7 @@ export default class App extends React.Component {
           }));
         }
       }
-      const configLabel = isCardioKind ? ((qa0.duration || 0) + ' min · ' + qa0.intensity) : ((qa0.sets || 0) + ' sets × ' + (qa0.reps || 0) + ' reps');
+      const configLabel = isCardioKind ? cardioLine({ distance: qa0.distance, duration: qa0.duration, rpe: qa0.rpe || 5 }) : ((qa0.sets || 0) + ' sets × ' + (qa0.reps || 0) + ' reps');
       const backMap = { recur: 'config', config: 'browseList', browseList: (kind === 'sport' ? 'type' : 'browseCat'), browseCat: 'type' };
       qa = {
         dayFull: FULL[day],
@@ -2863,7 +3221,9 @@ export default class App extends React.Component {
         onSets: (e) => this.setState({ quickAdd: { ...this.state.quickAdd, sets: numOrEmpty(e.target.value) } }),
         onReps: (e) => this.setState({ quickAdd: { ...this.state.quickAdd, reps: numOrEmpty(e.target.value) } }),
         onDuration: (e) => this.setState({ quickAdd: { ...this.state.quickAdd, duration: numOrEmpty(e.target.value) } }),
-        intensities: INTENSITIES.map(x => ({ label: x, bg: qa0.intensity === x ? TYPE_COLOR.Cardio : 'var(--surface-2)', color: qa0.intensity === x ? '#fff' : 'var(--text)', pick: () => this.setState({ quickAdd: { ...this.state.quickAdd, intensity: x } }) })),
+        distance: qa0.distance != null ? qa0.distance : '',
+        onDistance: (e) => this.setState({ quickAdd: { ...this.state.quickAdd, distance: numOrEmpty(e.target.value, true) } }),
+        efforts: this._effortChips(qa0.rpe || 5, (n) => this.setState({ quickAdd: { ...this.state.quickAdd, rpe: n } })),
         itemName: qa0.item ? qa0.item.name : '', configLabel,
         // A second workout isn't part of the recurring template, so there is nothing
         // to choose between "just today" and "every week" — commit straight away.
@@ -2928,7 +3288,7 @@ export default class App extends React.Component {
         everyLabel: 'Every ' + FULL[day],
         onceLabel: mOff ? 'Just that week' : 'Just this week',
         hasPeek: mOff !== 0 && exs.length > 0,
-        peekItems: mOff !== 0 ? exs.map(e => ({ name: e.name, detail: e.cardio ? ((e.duration || 0) + ' min · ' + (e.intensity || 'Moderate')) : ((e.sets || 0) + '×' + (e.reps || 0) + (e.weight ? ' · ' + e.weight + 'kg' : '')) })) : [],
+        peekItems: mOff !== 0 ? exs.map(e => ({ name: e.name, detail: scheme(e) })) : [],
         peekDone: mOff < 0 && !!(mView && mView.sessions[day] && mView.sessions[day].completed),
         setOnce: () => this.setState({ dayMenu: { ...this.state.dayMenu, scope: 'once' } }),
         setEvery: () => this.setState({ dayMenu: { ...this.state.dayMenu, scope: 'every' } }),
@@ -3029,6 +3389,19 @@ export default class App extends React.Component {
       { label: 'Meals', iconPath: PLATE, iconColor: TYPE_COLOR.Custom, tint: TYPE_TINT.Custom, select: () => this.setState({ screen: 'meals', menuOpen: false }) },
       { label: 'Archive', iconPath: 'M4 7h16v3H4V7zM5 10v9h14v-9M10 14h4', iconColor: TYPE_COLOR.Legs, tint: TYPE_TINT.Legs, select: () => this.setState({ screen: 'archive', menuOpen: false }) },
       { label: 'Rest mode', iconPath: MOON, iconColor: s.restMode ? 'var(--accent)' : 'var(--muted)', tint: s.restMode ? 'var(--accent-soft)' : 'var(--surface-2)', trailing: s.restMode ? 'On' : 'Off', trailingBg: s.restMode ? 'var(--accent)' : 'var(--surface-2)', trailingColor: s.restMode ? '#fff' : 'var(--muted)', select: () => { this.haptic(true); this.save({ restMode: !this.state.restMode }, 'the rest mode switch'); this.showToast(!this.state.restMode ? 'Rest mode on — workouts hidden until you turn it off.' : 'Rest mode off — workouts are back.'); } },
+      {
+        label: 'Appearance', iconPath: s.theme === 'dark' ? MOON : 'M12 7.5a4.5 4.5 0 1 1 0 9 4.5 4.5 0 0 1 0-9z M12 2.5v2 M12 19.5v2 M2.5 12h2 M19.5 12h2 M5.3 5.3l1.4 1.4 M17.3 17.3l1.4 1.4 M5.3 18.7l1.4-1.4 M17.3 6.7l1.4-1.4',
+        iconColor: 'var(--accent)', tint: 'var(--accent-soft)',
+        trailing: s.themeAuto ? ('Auto · ' + (s.theme === 'dark' ? 'Dark' : 'Light')) : ((s.theme === 'dark' ? 'Dark' : 'Light') + ' until ' + (this.isNightNow() ? '07:00' : '19:00')),
+        trailingBg: s.themeAuto ? 'var(--surface-2)' : 'var(--accent)', trailingColor: s.themeAuto ? 'var(--muted)' : '#fff',
+        select: () => {
+          const wasAuto = this.state.themeAuto, was = this.state.theme;
+          this.toggleTheme();
+          this.showToast(wasAuto
+            ? ((was === 'dark' ? 'Light' : 'Dark') + ' until ' + (this.isNightNow() ? '07:00' : '19:00') + ', then back to automatic.')
+            : 'Back to automatic — dark 19:00–07:00, light otherwise.');
+        },
+      },
       { label: 'Workout Settings', iconPath: 'M10 2h4M12 9v4l2.5 2.5M12 22a8 8 0 1 0 0-16 8 8 0 0 0 0 16z', iconColor: 'var(--accent)', tint: 'var(--accent-soft)', select: () => this.setState({ menuOpen: false, wsOpen: true }) },
       { label: 'Replay Tutorial', iconPath: 'M4 4v5h5M4 9a8 8 0 1 1-1 5', iconColor: TYPE_COLOR.Custom, tint: TYPE_TINT.Custom, select: () => this.setState({ menuOpen: false, screen: 'week', weekOffset: 0, activeDay: null, flowPhase: 'tutorial', tutStep: 0, tutRect: null }, () => this._tutMeasureSoon(300)) },
     ].map(m => ({ ...m, bg: 'transparent' }));
@@ -3051,19 +3424,36 @@ export default class App extends React.Component {
       // user just logged stays correctable even after the exercise advances or the
       // workout reaches its summary.
       let gLast = null;
-      wexs.forEach((e, xi) => (e.logged || []).forEach((l, li) => { if (!l.skipped && (!gLast || (l.ts || 0) >= gLast.ts)) gLast = { exIdx: xi, idx: li, ts: l.ts || 0, set: l.set, reps: l.reps, weight: l.weight, name: e.name }; }));
+      wexs.forEach((e, xi) => (e.logged || []).forEach((l, li) => { if (!l.skipped && (!gLast || (l.ts || 0) >= gLast.ts)) gLast = { exIdx: xi, idx: li, ts: l.ts || 0, set: l.set, reps: l.reps, weight: l.weight, secs: l.secs, timed: isTimed(e), bwEx: isBodyweight(e), name: e.name }; }));
+      const bwKg = this.bodyweightKg();
+      // What one logged set reads as: "0:45" for a hold, "BW+10kg × 8" / "60 kg × 8" otherwise.
+      const setText = (timed, bwEx, l) => (timed ? fmtSecs(l.secs) + (l.weight ? ' +' + l.weight + ' kg' : '') : ((bwEx ? loadLabel(true, l.weight) : (l.weight || 0) + ' kg') + ' × ' + (l.reps || 0)));
       const liftRows = wexs.filter(e => !e.cardio);
+      // Logged volume only (the summary is what was done, not what was planned), with
+      // dropsets and body weight counted; holds report their time instead.
+      const loggedVol = (e) => (isTimed(e) ? 0 : (e.logged || []).reduce((a, l) => a + setVol(l, isBodyweight(e), bwKg), 0));
       const sumRows = liftRows.map((e, i) => {
         const lg = (e.logged || []).filter(l => !l.skipped);
-        return { name: e.name, detail: lg.length + ' of ' + (e.sets || 0) + ' sets logged', vol: fmt(lg.reduce((a, l) => a + (l.reps || 0) * (l.weight || 0), 0)), divider: i === liftRows.length - 1 ? 'transparent' : 'var(--border)' };
+        const timed = isTimed(e);
+        return {
+          name: e.name,
+          detail: lg.length + ' of ' + (e.sets || 0) + (timed ? ' holds' : ' sets') + ' logged' + (timed && lg.length ? ' · ' + fmtSecs(lg.reduce((a, l) => a + (l.secs || 0), 0)) + ' total' : ''),
+          vol: timed ? fmtSecs(lg.reduce((a, l) => a + (l.secs || 0), 0)) : fmt(loggedVol(e)),
+          divider: i === liftRows.length - 1 ? 'transparent' : 'var(--border)',
+        };
       });
-      const totVol = liftRows.reduce((a, e) => a + (e.logged || []).filter(l => !l.skipped).reduce((x, l) => x + (l.reps || 0) * (l.weight || 0), 0), 0);
+      const totVol = liftRows.reduce((a, e) => a + loggedVol(e), 0);
       const es = wk.editSet;
       const wLastUsed = (we && !(we.logged || []).filter(l => !l.skipped).length) ? this.lastUsedFor(we.name) : null;
+      const weTimed = isTimed(we), weBw = isBodyweight(we);
+      // #2 — where this set sits in its superset round.
+      const wGroup = (we && phase !== 'summary') ? this._supersetGroup(wexs, wk.exIdx) : [];
+      const wNextInRound = wGroup.length > 1 ? wGroup.slice(wGroup.indexOf(wk.exIdx) + 1).find(j => (wexs[j].logged || []).length < (wexs[j].sets || 0)) : undefined;
+      const esEx = es ? wexs[es.exIdx != null ? es.exIdx : wk.exIdx] : null;
       wo = {
         dayLabel: (FULL[wk.day] || '') + ((wk.slot === 'b') ? ' · ' + ((wsess.label) || 'Second workout') : ''),
         // #62 — what this exercise was last lifted at, when nothing is logged yet today.
-        lastUsedLine: wLastUsed ? ('Last time ' + wLastUsed.weight + ' kg × ' + wLastUsed.reps + ' · ' + fmtDateShort(wLastUsed.date)) : '',
+        lastUsedLine: wLastUsed ? ('Last time ' + (weTimed ? fmtSecs(wLastUsed.secs) : ((weBw ? loadLabel(true, wLastUsed.weight) : wLastUsed.weight + ' kg') + ' × ' + wLastUsed.reps)) + ' · ' + fmtDateShort(wLastUsed.date)) : '',
         // #54 restart
         restartAsk: !!wk.restartAsk,
         askRestart: () => this.setState(s2 => s2.workout ? { workout: { ...s2.workout, restartAsk: true } } : null),
@@ -3086,13 +3476,13 @@ export default class App extends React.Component {
             current: i === wk.exIdx && phase !== 'summary',
             nameColor: (i === wk.exIdx && phase !== 'summary') ? 'var(--accent)' : 'var(--text)',
             rowBg: (i === wk.exIdx && phase !== 'summary') ? 'var(--accent-soft)' : 'var(--surface-2)',
-            meta: e.cardio ? ((e.duration || 0) + ' min · ' + (e.intensity || 'Moderate')) : (done + ' of ' + (e.sets || 0) + ' sets · target ' + (e.reps || 0) + ' × ' + (e.weight || 0) + ' kg'),
+            meta: e.cardio ? cardioLine(e) : (done + ' of ' + (e.sets || 0) + ' sets · target ' + (isTimed(e) ? (e.holdSecs ? fmtSecs(e.holdSecs) + ' hold' : 'hold') : repTarget(e) + ' × ' + (isBodyweight(e) ? loadLabel(true, e.weight) : (e.weight || 0) + ' kg'))),
             sets: e.cardio ? [] : Array.from({ length: Math.max(e.sets || 0, lg.length) }, (_, si) => {
               const l = lg[si];
               const isNow = i === wk.exIdx && si === wk.setIdx && phase !== 'summary';
               return {
                 label: 'Set ' + (si + 1),
-                text: l ? (l.skipped ? 'skipped' : ((l.weight || 0) + ' kg × ' + (l.reps || 0))) : (isNow ? 'up next' : '—'),
+                text: l ? (l.skipped ? 'skipped' : setText(isTimed(e), isBodyweight(e), l)) : (isNow ? 'up next' : '—'),
                 color: l ? (l.skipped ? 'var(--faint)' : 'var(--text)') : (isNow ? 'var(--accent)' : 'var(--faint)'),
                 weight: (l && !l.skipped) ? '700' : '600',
               };
@@ -3102,13 +3492,24 @@ export default class App extends React.Component {
         }),
         exName: phase === 'summary' ? 'Session summary' : (we ? we.name : ''),
         setLine: we ? 'Set ' + (wk.setIdx + 1) + ' of ' + (we.sets || 0) : '',
-        targetLine: we ? 'Target ' + (we.reps || 0) + ' reps × ' + (we.weight || 0) + ' kg' : '',
+        targetLine: we ? (weTimed ? (we.holdSecs ? 'Target ' + fmtSecs(we.holdSecs) + ' hold' : 'Hold as long as planned') : 'Target ' + repTarget(we) + ' reps × ' + (weBw ? loadLabel(true, we.weight) : (we.weight || 0) + ' kg')) : '',
+        // #10 — the range sits right above the reps input; what gets logged is the actual count.
+        repsTargetLabel: (we && !weTimed && hasRange(we)) ? 'Target ' + repTarget(we) : '',
+        // #4 / #5 — holds log a duration; bodyweight sets show the load they carry.
+        isTimed: weTimed, notTimed: !weTimed,
+        secs: wk.secs || '', secsLabel: fmtSecs(parseSecs(wk.secs) || 0),
+        onSecs: (e) => this.setState(s2 => s2.workout ? { workout: { ...s2.workout, secs: e.target.value } } : null),
+        secsDecDown: this._mkHold('secs', -5), secsIncDown: this._mkHold('secs', 5),
+        secsSwipe: (e) => this._woSwipe(e, 'secs'),
+        weightLabel: weBw ? '+Kg' : 'Kg',
+        bwLine: weBw ? ('BW ' + (bwKg ? bwKg + ' kg' : '— log your weight') + ' · add extra weight below') : '',
         dots: we ? Array.from({ length: we.sets || 0 }, (_, i) => ({ bg: i < loggedCount ? 'var(--accent)' : (i === wk.setIdx && phase === 'set' ? 'var(--text)' : 'var(--track)') })) : [],
         phaseSet: phase === 'set' && !es, phaseRest: phase === 'rest' && !es, phaseReady: phase === 'ready' && !es, phaseSummary: phase === 'summary' && !es, editing: !!es,
         // #56 — pairing notes and the dropset prompt that follows a working set
-        supersetLine: (we && we.supersetWith)
-          ? ('Superset → ' + we.supersetWith + ' straight after, no rest')
-          : (wk.superFrom != null ? ('Superset — second half of ' + ((wexs[wk.superFrom] || {}).name || '')) : ''),
+        supersetLine: wGroup.length < 2 ? ''
+          : (wNextInRound != null
+            ? ('Superset → ' + wexs[wNextInRound].name + ' straight after, no rest')
+            : ('Superset — last of the round, rest after this set')),
         phaseDrop: phase === 'drop' && !es,
         dropExName: we ? we.name : '',
         dropSub: we && we.dropset ? ('Drop to ' + we.dropset.pct + '% and go again — logged against set ' + ((wk.dropIdx || 0) + 1) + '.') : '',
@@ -3128,10 +3529,11 @@ export default class App extends React.Component {
         repsSwipe: (e) => this._woSwipe(e, 'reps'), weightSwipe: (e) => this._woSwipe(e, 'weight'),
         logLabel: we && wk.setIdx >= (we.sets || 0) - 1 ? 'Finish exercise' : 'Log set',
         logSet: () => this._woLog(false), skipSet: () => this._woLog(true),
+        restTitle: gLast ? gLast.name : (we ? we.name : ''),
         time: mmss(wk.restLeft || 0), circ: String(circ), dash: String(circ * (1 - frac)),
         arcColor: wk.paused ? 'var(--muted)' : 'var(--accent)',
         pauseHint: wk.paused ? 'paused' : 'tap to pause',
-        restSub: wk.paused ? 'Timer paused — tap the ring to resume.' : 'Ready for set ' + (wk.setIdx + 1) + ' when the timer ends.',
+        restSub: wk.paused ? 'Timer paused — tap the ring to resume.' : ('Up next: ' + (we ? we.name : '') + ' · set ' + (wk.setIdx + 1) + ' when the timer ends.'),
         togglePause: () => this.setState(s2 => s2.workout && s2.workout.phase === 'rest' ? { workout: { ...s2.workout, paused: !s2.workout.paused } } : null),
         plus30: () => this.setState(s2 => { const w = s2.workout; if (!w || w.phase !== 'rest') return null; const nl = (w.restLeft || 0) + 30; return { workout: { ...w, restLeft: nl, restTotal: Math.max(w.restTotal || 0, nl) } }; }),
         minus30: () => this.setState(s2 => { const w = s2.workout; if (!w || w.phase !== 'rest') return null; const nl = Math.max(0, (w.restLeft || 0) - 30); if (nl === 0) setTimeout(() => this._woRestDone(), 0); return { workout: { ...w, restLeft: nl } }; }),
@@ -3139,12 +3541,16 @@ export default class App extends React.Component {
         startNLabel: 'Start set ' + (wk.setIdx + 1),
         restMore: () => this.setState(s2 => s2.workout ? { workout: { ...s2.workout, phase: 'rest', restLeft: wcfg.rest, restTotal: wcfg.rest, paused: false, editSet: null } } : null),
         hasEditable: !!gLast,
-        justLogged: gLast ? 'Set ' + gLast.set + ' ✓ · ' + gLast.reps + ' × ' + gLast.weight + ' kg' : '',
+        justLogged: gLast ? 'Set ' + gLast.set + ' ✓ · ' + setText(gLast.timed, gLast.bwEx, gLast) : '',
         lastSetN: gLast ? gLast.set : 0,
-        editLast: () => { if (!gLast) return; this.setState(s2 => s2.workout ? { workout: { ...s2.workout, editSet: { exIdx: gLast.exIdx, idx: gLast.idx, n: gLast.set, reps: String(gLast.reps), weight: String(gLast.weight) } } } : null); },
+        editLast: () => { if (!gLast) return; this.setState(s2 => s2.workout ? { workout: { ...s2.workout, editSet: { exIdx: gLast.exIdx, idx: gLast.idx, n: gLast.set, reps: String(gLast.reps != null ? gLast.reps : ''), weight: String(gLast.weight || 0), secs: String(gLast.secs != null ? gLast.secs : '') } } } : null); },
+        esTimed: isTimed(esEx), esNotTimed: !isTimed(esEx),
+        esSecs: es ? (es.secs || '') : '',
+        onEsSecs: (e) => this.setState(s2 => s2.workout && s2.workout.editSet ? { workout: { ...s2.workout, editSet: { ...s2.workout.editSet, secs: e.target.value } } } : null),
+        esWeightLabel: isBodyweight(esEx) ? '+Kg' : 'Kg',
         editN: es ? es.n : 0,
         editExName: es ? ((wexs[es.exIdx] && wexs[es.exIdx].name) || '') : '',
-        editSub: (!!es && phase === 'rest') ? ('Timer keeps running · ' + mmss(wk.restLeft || 0) + ' left') : 'Fix the reps or weight, or undo to redo the set.',
+        editSub: (!!es && phase === 'rest') ? ('Timer keeps running · ' + mmss(wk.restLeft || 0) + ' left') : (isTimed(esEx) ? 'Fix the time or weight, or undo to redo the set.' : 'Fix the reps or weight, or undo to redo the set.'),
         esReps: es ? es.reps : '', esWeight: es ? es.weight : '',
         onEsReps: (e) => this.setState(s2 => s2.workout && s2.workout.editSet ? { workout: { ...s2.workout, editSet: { ...s2.workout.editSet, reps: e.target.value } } } : null),
         onEsWeight: (e) => this.setState(s2 => s2.workout && s2.workout.editSet ? { workout: { ...s2.workout, editSet: { ...s2.workout.editSet, weight: e.target.value } } } : null),
@@ -3627,11 +4033,15 @@ export default class App extends React.Component {
         })),
         onNotes: (e) => this.setState({ rpeSheet: { ...this.state.rpeSheet, notes: e.target.value } }),
         hasCardio: !!(s.rpeSheet.cardio && s.rpeSheet.cardio.length),
-        cardio: (s.rpeSheet.cardio || []).map((c, ci) => ({
-          name: c.name, duration: c.duration,
-          onDuration: (e) => { const arr = (this.state.rpeSheet.cardio || []).slice(); arr[ci] = { ...arr[ci], duration: numOrEmpty(e.target.value) }; this.setState({ rpeSheet: { ...this.state.rpeSheet, cardio: arr } }); },
-          intensities: INTENSITIES.map(x => ({ label: x, bg: c.intensity === x ? TYPE_COLOR.Cardio : 'var(--surface-2)', color: c.intensity === x ? '#fff' : 'var(--text)', pick: () => { const arr = (this.state.rpeSheet.cardio || []).slice(); arr[ci] = { ...arr[ci], intensity: x }; this.setState({ rpeSheet: { ...this.state.rpeSheet, cardio: arr } }); } })),
-        })),
+        cardio: (s.rpeSheet.cardio || []).map((c, ci) => {
+          const setC = (patch) => { const arr = (this.state.rpeSheet.cardio || []).slice(); arr[ci] = { ...arr[ci], ...patch }; this.setState({ rpeSheet: { ...this.state.rpeSheet, cardio: arr } }); };
+          return {
+            name: c.name, duration: c.duration, distance: c.distance,
+            onDuration: (e) => setC({ duration: numOrEmpty(e.target.value) }),
+            onDistance: (e) => setC({ distance: numOrEmpty(e.target.value, true) }),
+            efforts: this._effortChips(c.rpe, (n) => setC({ rpe: n })),
+          };
+        }),
         submit: () => this.submitRpe(),
       } : { scale: [], cardio: [] },
 
@@ -3817,7 +4227,9 @@ export default class App extends React.Component {
         return {
           name: f.name, duration: f.duration,
           onDuration: (e) => this.setState({ cardioAddForm: { ...this.state.cardioAddForm, duration: numOrEmpty(e.target.value) } }),
-          intensities: INTENSITIES.map(x => ({ label: x, bg: f.intensity === x ? TYPE_COLOR.Cardio : 'var(--surface-2)', color: f.intensity === x ? '#fff' : 'var(--text)', pick: () => this.setState({ cardioAddForm: { ...this.state.cardioAddForm, intensity: x } }) })),
+          distance: f.distance != null ? f.distance : '',
+          onDistance: (e) => this.setState({ cardioAddForm: { ...this.state.cardioAddForm, distance: numOrEmpty(e.target.value, true) } }),
+          efforts: this._effortChips(f.rpe || 5, (n) => this.setState({ cardioAddForm: { ...this.state.cardioAddForm, rpe: n } })),
           days: DAYS.map(d => {
             const t = s.program[d].type; const acts = s.program[d].exercises || [];
             const strength = acts.filter(a => !a.cardio).length;
@@ -3832,7 +4244,8 @@ export default class App extends React.Component {
       closeCardioAdd: () => this.setState({ cardioAddForm: null }),
       confirmCardioAdd: () => {
         const f = s.cardioAddForm; if (!f) return;
-        this.addCardioToProgram(f.day, { name: f.name, duration: f.duration || 0, intensity: f.intensity });
+        const cRpe = f.rpe || 5;
+        this.addCardioToProgram(f.day, { name: f.name, duration: f.duration || 0, distance: +f.distance || 0, rpe: cRpe, intensity: rpeIntensity(cRpe) });
         this.haptic(true);
         this.setState({ cardioAddForm: null });
         this.showToast(f.name + ' added to ' + FULL[f.day] + '.');
@@ -3881,7 +4294,7 @@ export default class App extends React.Component {
       sx,
       addExercise: () => {
         if (at === 'Cardio') this.setState({ quickAdd: { day: ad, slot: aslot, stage: 'browseCat', kind: 'cardio', cat: null, item: null, sets: 3, reps: 10, duration: 30, intensity: 'Moderate', recur: 'once', offset: 0 } });
-        else this.setState({ exForm: { mode: 'session', day: ad, slot: aslot, index: null, name: '', sets: 3, reps: 10, weight: 20 } });
+        else this.setState({ exForm: this._exFormFrom({ name: '', sets: 3, reps: 10, weight: 20 }, { mode: 'session', day: ad, slot: aslot, index: null }) });
       },
       // Typing isn't an action: a keystroke per undo step would bury everything else on
       // the stack, and the field itself is right there to edit back.
@@ -3913,14 +4326,19 @@ export default class App extends React.Component {
             onReps: (e) => setRow(i, { reps: numOrEmpty(e.target.value) }),
             onWeight: (e) => setRow(i, { weight: numOrEmpty(e.target.value, true) }),
             onDuration: (e) => setRow(i, { duration: numOrEmpty(e.target.value) }),
+            distance: r.distance,
+            onDistance: (e) => setRow(i, { distance: numOrEmpty(e.target.value, true) }),
+            efforts: this._effortChips(r.rpe, (n) => setRow(i, { rpe: n })),
+            timed: !!r.timed,
             hasLogged: (r.logged || []).length > 0,
             logged: (r.logged || []).map((l, k) => ({
               label: 'Set ' + (k + 1), skipped: l.skipped,
               reps: l.reps, weight: l.weight,
               onReps: (e) => setRow(i, { logged: r.logged.map((x, m) => (m === k ? { ...x, reps: numOrEmpty(e.target.value) } : x)) }),
+              secs: l.secs,
+              onSecs: (e) => setRow(i, { logged: r.logged.map((x, m) => (m === k ? { ...x, secs: e.target.value } : x)) }),
               onWeight: (e) => setRow(i, { logged: r.logged.map((x, m) => (m === k ? { ...x, weight: numOrEmpty(e.target.value, true) } : x)) }),
             })),
-            intensities: INTENSITIES.map(x => ({ label: x, bg: r.intensity === x ? TYPE_COLOR.Cardio : 'var(--surface-2)', color: r.intensity === x ? '#fff' : 'var(--muted)', pick: () => setRow(i, { intensity: x }) })),
             divider: i === f.rows.length - 1 ? 'transparent' : 'var(--border)',
           })),
           cancel: () => this.setState({ bulkEdit: null }),
@@ -3931,7 +4349,7 @@ export default class App extends React.Component {
             if (bad) { this.showToast('Check the numbers: up to 20 sets, 100 reps and 500 kg.'); return; }
             const list = (sess.exercises || []).map((e, i) => {
               const r = b.rows[i]; if (!r) return e;
-              if (e.cardio) return { ...e, duration: +r.duration || 0, intensity: r.intensity };
+              if (e.cardio) return { ...e, duration: +r.duration || 0, distance: +r.distance || 0, rpe: r.rpe || 5, intensity: rpeIntensity(r.rpe || 5) };
               const next = { ...e, sets: +r.sets || 0, reps: +r.reps || 0, weight: +r.weight || 0 };
               // Corrections to sets already logged rewrite those entries in place —
               // timestamps, skips, rest and dropsets are left as they were.
@@ -3939,6 +4357,7 @@ export default class App extends React.Component {
                 next.logged = e.logged.map((l, k) => {
                   const rl = (r.logged || [])[k];
                   if (!rl || l.skipped) return l;
+                  if (isTimed(e)) return { ...l, secs: parseSecs(rl.secs) || l.secs || 0, weight: +rl.weight || 0 };
                   return { ...l, reps: +rl.reps || 0, weight: +rl.weight || 0 };
                 });
               }
@@ -3952,7 +4371,7 @@ export default class App extends React.Component {
               const pex = (prog.exercises || []).map((e, i) => {
                 const li = list[i];
                 if (!li || li.name !== e.name) return e;
-                return e.cardio ? { ...e, duration: li.duration, intensity: li.intensity } : { ...e, sets: li.sets, reps: li.reps, weight: li.weight };
+                return e.cardio ? { ...e, duration: li.duration, distance: li.distance, rpe: li.rpe, intensity: li.intensity } : { ...e, sets: li.sets, reps: li.reps, weight: li.weight };
               });
               program = { ...program, [b.day]: { ...prog, exercises: pex } };
             }
@@ -4012,23 +4431,26 @@ export default class App extends React.Component {
       toggleComplete: () => {
         this.haptic(true);
         if (!asess.completed) { this.setState({ confirmComplete: true }); return; }
-        this.save({ sessions: this.patchSlot(ad, aslot, { completed: false }), sessionHistory: (s.sessionHistory || []).slice(), sessionPeek: null }, 'un-completing that session');
+        // Un-completing takes this week's record back out, so the day stops counting as
+        // completed in history, stats and — once archived — the Archive (#8).
+        const unrec = this.historyRecordFor(ad, aslot);
+        this.save({ sessions: this.patchSlot(ad, aslot, { completed: false }), sessionHistory: (s.sessionHistory || []).filter(r => !unrec || r.id !== unrec.id), sessionPeek: null }, 'un-completing that session');
       },
       ccOpen: !!s.confirmComplete && !!asess,
       cc: (s.confirmComplete && asess) ? {
         sub: 'Check your ' + FULL[ad] + (aslot === 'b' ? ' ' + slotName('b') : '') + ' session before rating your effort.',
         exercises: (asess.exercises || []).map((e, i) => ({ name: e.name, scheme: scheme(e), divider: i === (asess.exercises || []).length - 1 ? 'transparent' : 'var(--border)' })),
-        volume: fmt((asess.exercises || []).reduce((a, e) => a + exVol(e), 0)),
+        volume: fmt((asess.exercises || []).reduce((a, e) => a + this.exVol(e), 0)),
         close: () => this.setState({ confirmComplete: false }),
         confirm: () => {
           this.haptic(true);
           let sessionHistory = (this.state.sessionHistory || []).slice();
           const todayISO = new Date().toISOString().slice(0, 10);
-          const vol = (asess.exercises || []).reduce((a, e) => a + exVol(e), 0);
-          const rec = { id: this.historyId(ad, aslot, todayISO), slot: aslot, date: todayISO, day: ad, type: at, label: aslot === 'b' ? slotName('b') : asess.label, exercises: (asess.exercises || []).map(x => ({ ...x })), volume: vol };
+          const vol = (asess.exercises || []).reduce((a, e) => a + this.exVol(e), 0);
+          const rec = { id: this.historyId(ad, aslot, todayISO), slot: aslot, date: todayISO, day: ad, type: at, label: aslot === 'b' ? slotName('b') : asess.label, exercises: (asess.exercises || []).map(x => ({ ...x })), volume: vol, completed: true };
           const idx = sessionHistory.findIndex(r => r.id === rec.id);
           if (idx >= 0) sessionHistory[idx] = { ...rec, rpe: sessionHistory[idx].rpe, notes: sessionHistory[idx].notes, perf: sessionHistory[idx].perf }; else sessionHistory.push(rec);
-          const cardioActs = (asess.exercises || []).map((e, i) => ({ e, i })).filter(x => x.e.cardio).map(x => ({ idx: x.i, name: x.e.name, duration: x.e.duration || 0, intensity: x.e.intensity || 'Moderate' }));
+          const cardioActs = (asess.exercises || []).map((e, i) => ({ e, i })).filter(x => x.e.cardio).map(x => ({ idx: x.i, name: x.e.name, duration: x.e.duration || 0, distance: x.e.distance || '', rpe: cardioRpe(x.e) }));
           this.setState({ confirmComplete: false });
           this.save({ sessions: this.patchSlot(ad, aslot, { completed: true }), sessionHistory, sessionPeek: null, rpeSheet: { id: rec.id, day: ad, slot: aslot, type: at, rpe: null, notes: '', cardio: cardioActs } }, 'completing that session');
         },
@@ -4052,7 +4474,7 @@ export default class App extends React.Component {
 
       programDays,
       pdx,
-      addProgramExercise: () => this.setState({ exForm: { mode: 'program', day: apd, index: null, name: '', sets: 3, reps: 10, weight: 20 } }),
+      addProgramExercise: () => this.setState({ exForm: this._exFormFrom({ name: '', sets: 3, reps: 10, weight: 20 }, { mode: 'program', day: apd, index: null }) }),
       exitReorder: () => this.setState({ reorderMode: null, drag: null }),
       openHistory: () => this.setState({ screen: 'history' }),
       historyEmpty: (s.sessionHistory || []).length === 0,
@@ -4075,7 +4497,7 @@ export default class App extends React.Component {
             startDate, endDate,
             label: 'From ' + fmtDate(startDate) + ' to ' + fmtDate(endDate),
             days: snapshot,
-            sessions: sorted.map(h => ({ day: h.day, type: h.type, date: h.date, label: h.label, rpe: h.rpe, notes: h.notes, exercises: h.exercises })),
+            sessions: sorted.map(h => ({ day: h.day, type: h.type, date: h.date, label: h.label, slot: h.slot, rpe: h.rpe, notes: h.notes, exercises: h.exercises, ...(h.completed === false ? { completed: false } : {}) })),
           };
           archive = [entry, ...s.archive];
         }
@@ -4133,35 +4555,46 @@ export default class App extends React.Component {
       } : null,
       saveExercise: () => {
         const f = s.exForm; if (!f) return;
-        const item = f.cardio
-          ? { name: f.name || 'Cardio', cardio: true, duration: f.duration || 0, intensity: f.intensity || 'Moderate' }
-          : { name: f.name || 'Exercise', sets: f.sets || 0, reps: f.reps || 0, weight: f.weight || 0, ...(f.supersetWith ? { supersetWith: f.supersetWith } : {}), ...(f.dropset ? { dropset: { pct: f.dropset.pct } } : {}) };
+        if (!f.cardio && f.repRange && !(+f.repsMax > +f.repsMin && +f.repsMin > 0)) { this.showToast('Set a rep range with a max higher than the min.'); return; }
+        const item = this._exItemFromForm(f);
         this.haptic(false);
+        const listIn = (exs) => (exs || [])[f.index] || null;
         if (f.mode === 'program') {
-          const day = f.day; const p = s.program[day]; const list = (p.exercises || []).slice();
-          if (f.index === null) list.push(item); else list[f.index] = item;
-          this.updateProgramDay(day, { exercises: list });
+          const day = f.day; const p = s.program[day];
+          const prev = f.index === null ? null : listIn(p.exercises);
+          this.updateProgramDay(day, { exercises: this._applyExerciseEdit(p.exercises, f.index, item, prev && prev.supersetWith) });
         } else {
           const day = f.day; const slot = f.slot || 'a';
           const sess = this.slotSession(day, slot); if (!sess) { this.setState({ exForm: null }); return; }
-          const list = (sess.exercises || []).slice();
-          if (f.index === null) list.push(item); else list[f.index] = item;
+          const prev = f.index === null ? null : listIn(sess.exercises);
+          const list = this._applyExerciseEdit(sess.exercises, f.index, item, prev && prev.supersetWith);
           // The recurring template mirrors the day's main workout only — a second
           // workout is a one-off for that day and never rewrites the program.
-          this.saveSessionExercises(day, slot, list, slot === 'a' ? { program: this.syncProgramExercise(day, f.index, item) } : null);
+          let extra = null;
+          if (slot === 'a') {
+            const prog = s.program[day];
+            extra = prog ? { program: { ...s.program, [day]: { ...prog, exercises: this._applyExerciseEdit(prog.exercises, (f.index === null || f.index >= (prog.exercises || []).length) ? null : f.index, item, prev && prev.supersetWith).map(x => { const c = { ...x }; delete c.logged; return c; }) } } } : null;
+          }
+          this.saveSessionExercises(day, slot, list, extra);
         }
+        if (item.supersetWith && f.supersetWith && this._supersetChoices(f).indexOf(f.supersetWith) < 0) this.showToast(f.supersetWith + ' added as a superset with ' + item.name + '.');
         this.setState({ exForm: null });
       },
       deleteExercise: () => {
         const f = s.exForm; if (!f || f.index === null) return;
         if (f.mode === 'program') {
-          const day = f.day; const p = s.program[day]; const list = (p.exercises || []).filter((_, i) => i !== f.index);
+          const day = f.day; const p = s.program[day]; const gone = (p.exercises || [])[f.index];
+          const list = (p.exercises || []).filter((_, i) => i !== f.index).map(x => this._unpair(x, gone));
           this.updateProgramDay(day, { exercises: list });
         } else {
           const day = f.day; const slot = f.slot || 'a';
           const sess = this.slotSession(day, slot); if (!sess) { this.setState({ exForm: null }); return; }
-          const list = (sess.exercises || []).filter((_, i) => i !== f.index);
-          this.saveSessionExercises(day, slot, list, slot === 'a' ? { program: this.removeProgramExerciseAt(day, f.index) } : null);
+          const gone = (sess.exercises || [])[f.index];
+          const unpair = (x) => this._unpair(x, gone);
+          const list = (sess.exercises || []).filter((_, i) => i !== f.index).map(unpair);
+          let program = slot === 'a' ? this.removeProgramExerciseAt(day, f.index) : null;
+          if (program && program[day]) program = { ...program, [day]: { ...program[day], exercises: (program[day].exercises || []).map(unpair) } };
+          this.saveSessionExercises(day, slot, list, program ? { program } : null);
         }
         this.setState({ exForm: null });
       },

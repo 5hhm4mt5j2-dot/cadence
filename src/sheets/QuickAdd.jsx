@@ -1,4 +1,5 @@
 import { s } from '../lib/helpers';
+import CardioFields from '../components/CardioFields';
 
 export default function QuickAdd({ v }) {
   const qa = v.qa;
@@ -76,22 +77,7 @@ export default function QuickAdd({ v }) {
                 </div>
               </div>
             )}
-            {qa.isCardioKind && (
-              <>
-                <div style={s('margin-top:18px;')}>
-                  <div style={s('font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin-bottom:6px;')}>Duration (min)</div>
-                  <input type="number" value={qa.duration} onChange={qa.onDuration} style={s("width:100%; border:1px solid var(--border); border-radius:11px; padding:11px 10px; background:var(--surface-2); font-family:'JetBrains Mono',monospace; font-size:16px; font-weight:700; color:var(--text); outline:none; text-align:center;")} />
-                </div>
-                <div style={s('margin-top:16px;')}>
-                  <div style={s('font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin-bottom:8px;')}>Intensity</div>
-                  <div style={s('display:flex; gap:8px;')}>
-                    {qa.intensities.map((it, i) => (
-                      <button key={i} onClick={it.pick} style={s(`flex:1; border:none; cursor:pointer; font-family:inherit; font-size:12.5px; font-weight:700; padding:11px 0; border-radius:11px; background:${it.bg}; color:${it.color};`)}>{it.label}</button>
-                    ))}
-                  </div>
-                </div>
-              </>
-            )}
+            {qa.isCardioKind && <div style={s('margin-top:6px;')}><CardioFields c={qa} /></div>}
             <button onClick={qa.toRecur} style={s('width:100%; margin-top:22px; border:none; cursor:pointer; background:var(--text); color:var(--surface); font-family:inherit; font-size:14px; font-weight:800; padding:14px 0; border-radius:13px;')}>Continue</button>
           </>
         )}

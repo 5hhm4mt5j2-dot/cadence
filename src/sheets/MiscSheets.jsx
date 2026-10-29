@@ -1,4 +1,5 @@
 import { s } from '../lib/helpers';
+import CardioFields from '../components/CardioFields';
 
 export function ImportConfirm({ v }) {
   return (
@@ -260,17 +261,8 @@ export function BulkEdit({ v }) {
                     <input type="number" value={r.weight} onChange={r.onWeight} aria-label={'Weight for ' + r.name} style={s("width:62px; flex:none; border:1px solid var(--border); border-radius:10px; padding:9px 4px; background:var(--surface); font-family:'JetBrains Mono',monospace; font-size:14px; font-weight:700; color:var(--text); outline:none; text-align:center;")} />
                   </>
                 )}
-                {r.cardio && (
-                  <input type="number" value={r.duration} onChange={r.onDuration} aria-label={'Minutes for ' + r.name} style={s("width:174px; flex:none; border:1px solid var(--border); border-radius:10px; padding:9px 4px; background:var(--surface); font-family:'JetBrains Mono',monospace; font-size:14px; font-weight:700; color:var(--text); outline:none; text-align:center;")} />
-                )}
               </div>
-              {r.cardio && (
-                <div style={s('display:flex; gap:6px; margin-top:8px;')}>
-                  {r.intensities.map((it, j) => (
-                    <button key={j} onClick={it.pick} style={s(`flex:1; border:none; cursor:pointer; font-family:inherit; font-size:11.5px; font-weight:700; padding:8px 0; border-radius:10px; background:${it.bg}; color:${it.color};`)}>{it.label}</button>
-                  ))}
-                </div>
-              )}
+              {r.cardio && <CardioFields c={r} compact />}
               {r.hasLogged && (
                 <div style={s('margin-top:9px; padding-left:2px;')}>
                   <div style={s('font-size:9.5px; font-weight:700; color:var(--faint); text-transform:uppercase; letter-spacing:.06em; margin-bottom:5px;')}>Logged sets</div>
@@ -279,7 +271,11 @@ export function BulkEdit({ v }) {
                       <span style={s('flex:1; min-width:0; font-size:11.5px; font-weight:600; color:var(--muted);')}>{l.label}{l.skipped ? ' · skipped' : ''}</span>
                       {!l.skipped && (
                         <>
-                          <input type="number" value={l.reps} onChange={l.onReps} aria-label={l.label + ' reps for ' + r.name} style={s("width:52px; flex:none; border:1px solid var(--border); border-radius:10px; padding:7px 4px; background:var(--surface); font-family:'JetBrains Mono',monospace; font-size:13px; font-weight:700; color:var(--text); outline:none; text-align:center;")} />
+                          {r.timed ? (
+                            <input inputMode="numeric" value={l.secs} onChange={l.onSecs} aria-label={l.label + ' seconds for ' + r.name} style={s("width:52px; flex:none; border:1px solid var(--border); border-radius:10px; padding:7px 4px; background:var(--surface); font-family:'JetBrains Mono',monospace; font-size:13px; font-weight:700; color:var(--text); outline:none; text-align:center;")} />
+                          ) : (
+                            <input type="number" value={l.reps} onChange={l.onReps} aria-label={l.label + ' reps for ' + r.name} style={s("width:52px; flex:none; border:1px solid var(--border); border-radius:10px; padding:7px 4px; background:var(--surface); font-family:'JetBrains Mono',monospace; font-size:13px; font-weight:700; color:var(--text); outline:none; text-align:center;")} />
+                          )}
                           <input type="number" value={l.weight} onChange={l.onWeight} aria-label={l.label + ' weight for ' + r.name} style={s("width:62px; flex:none; border:1px solid var(--border); border-radius:10px; padding:7px 4px; background:var(--surface); font-family:'JetBrains Mono',monospace; font-size:13px; font-weight:700; color:var(--text); outline:none; text-align:center;")} />
                         </>
                       )}

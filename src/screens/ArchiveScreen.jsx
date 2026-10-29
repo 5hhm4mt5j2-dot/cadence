@@ -24,7 +24,7 @@ export function ArchiveScreen({ v }) {
               )}
               <div style={s('display:flex; align-items:baseline; gap:8px; margin-top:9px;')}>
                 <span style={s("font-family:'JetBrains Mono',monospace; font-size:22px; font-weight:700; color:var(--accent); letter-spacing:-.02em;")}>{w.volume}</span>
-                <span style={s('font-size:12px; color:var(--muted); font-weight:600;')}>{w.count} sessions</span>
+                <span style={s('font-size:12px; color:var(--muted); font-weight:600;')}>{w.count} completed {w.count === 1 ? 'day' : 'days'}</span>
               </div>
             </div>
           </div>
@@ -48,7 +48,7 @@ export function ArchiveDetailScreen({ v }) {
       <div style={s('font-size:12px; color:var(--muted); font-weight:600; margin-top:3px;')}>{ad.range}</div>
       <div style={s('display:flex; align-items:baseline; gap:8px; margin-top:6px;')}>
         <span style={s("font-family:'JetBrains Mono',monospace; font-size:15px; font-weight:700; color:var(--accent);")}>{ad.volume}</span>
-        <span style={s('font-size:12px; color:var(--muted); font-weight:600;')}>total · {ad.count} sessions</span>
+        <span style={s('font-size:12px; color:var(--muted); font-weight:600;')}>total · {ad.count} completed {ad.count === 1 ? 'day' : 'days'}</span>
       </div>
       <button onClick={v.exportArchivePdf} style={s('width:100%; margin-top:14px; border:1px solid var(--border); background:var(--surface); cursor:pointer; font-family:inherit; font-size:13px; font-weight:700; color:var(--text); padding:11px 0; border-radius:12px;')}>Export PDF</button>
 
@@ -71,8 +71,11 @@ export function ArchiveDetailScreen({ v }) {
         </div>
       ))}
 
+      {ad.noSessions && (
+        <div style={s('margin-top:16px; text-align:center; padding:24px 20px; background:var(--surface); border:1px dashed var(--border); border-radius:16px; font-size:12.5px; color:var(--muted); font-weight:500;')}>No days were completed while this program ran.</div>
+      )}
       {ad.hasSessions && (
-        <div style={s('font-size:11px; font-weight:700; color:var(--faint); text-transform:uppercase; letter-spacing:.06em; margin:20px 4px 8px;')}>Sessions logged</div>
+        <div style={s('font-size:11px; font-weight:700; color:var(--faint); text-transform:uppercase; letter-spacing:.06em; margin:20px 4px 8px;')}>Completed days</div>
       )}
       <div style={s('display:flex; flex-direction:column; gap:12px;')}>
         {ad.sessions.map((se, i) => (

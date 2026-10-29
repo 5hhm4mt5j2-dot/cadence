@@ -32,6 +32,9 @@ export default function WorkoutMode({ v }) {
           <div style={s('text-align:center;')}>
             <div style={s('font-size:16px; font-weight:800; color:var(--text);')}>{wo.setLine}</div>
             <div style={s('font-size:12px; font-weight:600; color:var(--muted); margin-top:3px;')}>{wo.targetLine}</div>
+            {!!wo.bwLine && (
+              <div style={s('display:inline-block; margin-top:6px; font-size:11px; font-weight:800; color:var(--text); background:var(--surface-2); padding:4px 10px; border-radius:999px;')}>{wo.bwLine}</div>
+            )}
             {!!wo.lastUsedLine && (
               <div style={s("font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:700; color:var(--accent); margin-top:4px;")}>{wo.lastUsedLine}</div>
             )}
@@ -40,14 +43,30 @@ export default function WorkoutMode({ v }) {
             )}
           </div>
           <div style={s('background:var(--surface); border:1px solid var(--border); border-radius:22px; padding:18px; box-shadow:var(--shadow); display:flex; flex-direction:column; gap:14px;')}>
+            {!!wo.repsTargetLabel && (
+              <div style={s("margin-bottom:-6px; text-align:center; font-family:'JetBrains Mono',monospace; font-size:12px; font-weight:800; color:var(--accent);")}>{wo.repsTargetLabel}</div>
+            )}
+            {wo.notTimed && (
+              <div style={s('display:flex; align-items:center; gap:10px;')}>
+                <span style={s('width:44px; flex:none; font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.05em;')}>Reps</span>
+                <button onMouseDown={wo.repsDecDown} onTouchStart={wo.repsDecDown} onMouseUp={wo.holdEnd} onMouseLeave={wo.holdEnd} onTouchEnd={wo.holdEnd} onTouchCancel={wo.holdEnd} style={s('width:54px; height:54px; flex:none; border:none; border-radius:16px; background:var(--surface-2); color:var(--text); cursor:pointer; font-size:26px; font-weight:600; font-family:inherit; user-select:none; -webkit-user-select:none; transition:transform .1s ease;')}>−</button>
+                <input value={wo.reps} onChange={wo.onReps} onTouchStart={wo.valTS} onTouchEnd={wo.repsSwipe} inputMode="decimal" aria-label="Reps" style={s("flex:1; min-width:0; height:54px; border:none; outline:none; border-radius:16px; background:var(--surface-2); text-align:center; font-family:'JetBrains Mono',monospace; font-size:26px; font-weight:700; color:var(--text);")} />
+                <button onMouseDown={wo.repsIncDown} onTouchStart={wo.repsIncDown} onMouseUp={wo.holdEnd} onMouseLeave={wo.holdEnd} onTouchEnd={wo.holdEnd} onTouchCancel={wo.holdEnd} style={s('width:54px; height:54px; flex:none; border:none; border-radius:16px; background:var(--surface-2); color:var(--text); cursor:pointer; font-size:26px; font-weight:600; font-family:inherit; user-select:none; -webkit-user-select:none; transition:transform .1s ease;')}>+</button>
+              </div>
+            )}
+            {wo.isTimed && (
+              <div style={s('display:flex; align-items:center; gap:10px;')}>
+                <span style={s('width:44px; flex:none; font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.05em;')}>Secs</span>
+                <button onMouseDown={wo.secsDecDown} onTouchStart={wo.secsDecDown} onMouseUp={wo.holdEnd} onMouseLeave={wo.holdEnd} onTouchEnd={wo.holdEnd} onTouchCancel={wo.holdEnd} style={s('width:54px; height:54px; flex:none; border:none; border-radius:16px; background:var(--surface-2); color:var(--text); cursor:pointer; font-size:26px; font-weight:600; font-family:inherit; user-select:none; -webkit-user-select:none; transition:transform .1s ease;')}>−</button>
+                <input value={wo.secs} onChange={wo.onSecs} onTouchStart={wo.valTS} onTouchEnd={wo.secsSwipe} inputMode="numeric" aria-label="Hold time in seconds (or m:ss)" style={s("flex:1; min-width:0; height:54px; border:none; outline:none; border-radius:16px; background:var(--surface-2); text-align:center; font-family:'JetBrains Mono',monospace; font-size:26px; font-weight:700; color:var(--text);")} />
+                <button onMouseDown={wo.secsIncDown} onTouchStart={wo.secsIncDown} onMouseUp={wo.holdEnd} onMouseLeave={wo.holdEnd} onTouchEnd={wo.holdEnd} onTouchCancel={wo.holdEnd} style={s('width:54px; height:54px; flex:none; border:none; border-radius:16px; background:var(--surface-2); color:var(--text); cursor:pointer; font-size:26px; font-weight:600; font-family:inherit; user-select:none; -webkit-user-select:none; transition:transform .1s ease;')}>+</button>
+              </div>
+            )}
+            {wo.isTimed && (
+              <div style={s("margin-top:-6px; text-align:center; font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:700; color:var(--muted);")}>{wo.secsLabel} · seconds, or type m:ss</div>
+            )}
             <div style={s('display:flex; align-items:center; gap:10px;')}>
-              <span style={s('width:44px; flex:none; font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.05em;')}>Reps</span>
-              <button onMouseDown={wo.repsDecDown} onTouchStart={wo.repsDecDown} onMouseUp={wo.holdEnd} onMouseLeave={wo.holdEnd} onTouchEnd={wo.holdEnd} onTouchCancel={wo.holdEnd} style={s('width:54px; height:54px; flex:none; border:none; border-radius:16px; background:var(--surface-2); color:var(--text); cursor:pointer; font-size:26px; font-weight:600; font-family:inherit; user-select:none; -webkit-user-select:none; transition:transform .1s ease;')}>−</button>
-              <input value={wo.reps} onChange={wo.onReps} onTouchStart={wo.valTS} onTouchEnd={wo.repsSwipe} inputMode="decimal" aria-label="Reps" style={s("flex:1; min-width:0; height:54px; border:none; outline:none; border-radius:16px; background:var(--surface-2); text-align:center; font-family:'JetBrains Mono',monospace; font-size:26px; font-weight:700; color:var(--text);")} />
-              <button onMouseDown={wo.repsIncDown} onTouchStart={wo.repsIncDown} onMouseUp={wo.holdEnd} onMouseLeave={wo.holdEnd} onTouchEnd={wo.holdEnd} onTouchCancel={wo.holdEnd} style={s('width:54px; height:54px; flex:none; border:none; border-radius:16px; background:var(--surface-2); color:var(--text); cursor:pointer; font-size:26px; font-weight:600; font-family:inherit; user-select:none; -webkit-user-select:none; transition:transform .1s ease;')}>+</button>
-            </div>
-            <div style={s('display:flex; align-items:center; gap:10px;')}>
-              <span style={s('width:44px; flex:none; font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.05em;')}>Kg</span>
+              <span style={s('width:44px; flex:none; font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.05em;')}>{wo.weightLabel}</span>
               <button onMouseDown={wo.wDecDown} onTouchStart={wo.wDecDown} onMouseUp={wo.holdEnd} onMouseLeave={wo.holdEnd} onTouchEnd={wo.holdEnd} onTouchCancel={wo.holdEnd} style={s('width:54px; height:54px; flex:none; border:none; border-radius:16px; background:var(--surface-2); color:var(--text); cursor:pointer; font-size:26px; font-weight:600; font-family:inherit; user-select:none; -webkit-user-select:none; transition:transform .1s ease;')}>−</button>
               <input value={wo.weight} onChange={wo.onWeight} onTouchStart={wo.valTS} onTouchEnd={wo.weightSwipe} inputMode="decimal" aria-label="Weight in kg" style={s("flex:1; min-width:0; height:54px; border:none; outline:none; border-radius:16px; background:var(--surface-2); text-align:center; font-family:'JetBrains Mono',monospace; font-size:26px; font-weight:700; color:var(--text);")} />
               <button onMouseDown={wo.wIncDown} onTouchStart={wo.wIncDown} onMouseUp={wo.holdEnd} onMouseLeave={wo.holdEnd} onTouchEnd={wo.holdEnd} onTouchCancel={wo.holdEnd} style={s('width:54px; height:54px; flex:none; border:none; border-radius:16px; background:var(--surface-2); color:var(--text); cursor:pointer; font-size:26px; font-weight:600; font-family:inherit; user-select:none; -webkit-user-select:none; transition:transform .1s ease;')}>+</button>
@@ -98,7 +117,7 @@ export default function WorkoutMode({ v }) {
         <div style={s('flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:20px; padding:0 24px 26px;')}>
           <div style={s('text-align:center;')}>
             <div style={s('font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.09em;')}>Rest</div>
-            <div style={s('font-size:17px; font-weight:800; color:var(--text); letter-spacing:-.02em; margin-top:4px;')}>{wo.exName}</div>
+            <div style={s('font-size:17px; font-weight:800; color:var(--text); letter-spacing:-.02em; margin-top:4px;')}>{wo.restTitle}</div>
             <div style={s("font-family:'JetBrains Mono',monospace; font-size:11.5px; font-weight:700; color:var(--accent); margin-top:5px;")}>{wo.justLogged}</div>
           </div>
           <div onClick={wo.togglePause} style={s('position:relative; z-index:11; width:224px; height:224px; cursor:pointer;')}>
@@ -131,14 +150,24 @@ export default function WorkoutMode({ v }) {
             <div style={s('font-size:12px; font-weight:600; color:var(--muted); margin-top:3px;')}>{wo.editSub}</div>
           </div>
           <div style={s('background:var(--surface); border:1px solid var(--border); border-radius:22px; padding:18px; box-shadow:var(--shadow); display:flex; flex-direction:column; gap:14px;')}>
+            {wo.esNotTimed && (
+              <div style={s('display:flex; align-items:center; gap:10px;')}>
+                <span style={s('width:44px; flex:none; font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.05em;')}>Reps</span>
+                <button onMouseDown={wo.repsDecDown} onTouchStart={wo.repsDecDown} onMouseUp={wo.holdEnd} onMouseLeave={wo.holdEnd} onTouchEnd={wo.holdEnd} onTouchCancel={wo.holdEnd} style={s('width:54px; height:54px; flex:none; border:none; border-radius:16px; background:var(--surface-2); color:var(--text); cursor:pointer; font-size:26px; font-weight:600; font-family:inherit; user-select:none; -webkit-user-select:none;')}>−</button>
+                <input value={wo.esReps} onChange={wo.onEsReps} inputMode="decimal" aria-label="Reps" style={s("flex:1; min-width:0; height:54px; border:none; outline:none; border-radius:16px; background:var(--surface-2); text-align:center; font-family:'JetBrains Mono',monospace; font-size:26px; font-weight:700; color:var(--text);")} />
+                <button onMouseDown={wo.repsIncDown} onTouchStart={wo.repsIncDown} onMouseUp={wo.holdEnd} onMouseLeave={wo.holdEnd} onTouchEnd={wo.holdEnd} onTouchCancel={wo.holdEnd} style={s('width:54px; height:54px; flex:none; border:none; border-radius:16px; background:var(--surface-2); color:var(--text); cursor:pointer; font-size:26px; font-weight:600; font-family:inherit; user-select:none; -webkit-user-select:none;')}>+</button>
+              </div>
+            )}
+            {wo.esTimed && (
+              <div style={s('display:flex; align-items:center; gap:10px;')}>
+                <span style={s('width:44px; flex:none; font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.05em;')}>Secs</span>
+                <button onMouseDown={wo.secsDecDown} onTouchStart={wo.secsDecDown} onMouseUp={wo.holdEnd} onMouseLeave={wo.holdEnd} onTouchEnd={wo.holdEnd} onTouchCancel={wo.holdEnd} style={s('width:54px; height:54px; flex:none; border:none; border-radius:16px; background:var(--surface-2); color:var(--text); cursor:pointer; font-size:26px; font-weight:600; font-family:inherit; user-select:none; -webkit-user-select:none;')}>−</button>
+                <input value={wo.esSecs} onChange={wo.onEsSecs} inputMode="numeric" aria-label="Hold time in seconds" style={s("flex:1; min-width:0; height:54px; border:none; outline:none; border-radius:16px; background:var(--surface-2); text-align:center; font-family:'JetBrains Mono',monospace; font-size:26px; font-weight:700; color:var(--text);")} />
+                <button onMouseDown={wo.secsIncDown} onTouchStart={wo.secsIncDown} onMouseUp={wo.holdEnd} onMouseLeave={wo.holdEnd} onTouchEnd={wo.holdEnd} onTouchCancel={wo.holdEnd} style={s('width:54px; height:54px; flex:none; border:none; border-radius:16px; background:var(--surface-2); color:var(--text); cursor:pointer; font-size:26px; font-weight:600; font-family:inherit; user-select:none; -webkit-user-select:none;')}>+</button>
+              </div>
+            )}
             <div style={s('display:flex; align-items:center; gap:10px;')}>
-              <span style={s('width:44px; flex:none; font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.05em;')}>Reps</span>
-              <button onMouseDown={wo.repsDecDown} onTouchStart={wo.repsDecDown} onMouseUp={wo.holdEnd} onMouseLeave={wo.holdEnd} onTouchEnd={wo.holdEnd} onTouchCancel={wo.holdEnd} style={s('width:54px; height:54px; flex:none; border:none; border-radius:16px; background:var(--surface-2); color:var(--text); cursor:pointer; font-size:26px; font-weight:600; font-family:inherit; user-select:none; -webkit-user-select:none;')}>−</button>
-              <input value={wo.esReps} onChange={wo.onEsReps} inputMode="decimal" aria-label="Reps" style={s("flex:1; min-width:0; height:54px; border:none; outline:none; border-radius:16px; background:var(--surface-2); text-align:center; font-family:'JetBrains Mono',monospace; font-size:26px; font-weight:700; color:var(--text);")} />
-              <button onMouseDown={wo.repsIncDown} onTouchStart={wo.repsIncDown} onMouseUp={wo.holdEnd} onMouseLeave={wo.holdEnd} onTouchEnd={wo.holdEnd} onTouchCancel={wo.holdEnd} style={s('width:54px; height:54px; flex:none; border:none; border-radius:16px; background:var(--surface-2); color:var(--text); cursor:pointer; font-size:26px; font-weight:600; font-family:inherit; user-select:none; -webkit-user-select:none;')}>+</button>
-            </div>
-            <div style={s('display:flex; align-items:center; gap:10px;')}>
-              <span style={s('width:44px; flex:none; font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.05em;')}>Kg</span>
+              <span style={s('width:44px; flex:none; font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.05em;')}>{wo.esWeightLabel}</span>
               <button onMouseDown={wo.wDecDown} onTouchStart={wo.wDecDown} onMouseUp={wo.holdEnd} onMouseLeave={wo.holdEnd} onTouchEnd={wo.holdEnd} onTouchCancel={wo.holdEnd} style={s('width:54px; height:54px; flex:none; border:none; border-radius:16px; background:var(--surface-2); color:var(--text); cursor:pointer; font-size:26px; font-weight:600; font-family:inherit; user-select:none; -webkit-user-select:none;')}>−</button>
               <input value={wo.esWeight} onChange={wo.onEsWeight} inputMode="decimal" aria-label="Weight in kg" style={s("flex:1; min-width:0; height:54px; border:none; outline:none; border-radius:16px; background:var(--surface-2); text-align:center; font-family:'JetBrains Mono',monospace; font-size:26px; font-weight:700; color:var(--text);")} />
               <button onMouseDown={wo.wIncDown} onTouchStart={wo.wIncDown} onMouseUp={wo.holdEnd} onMouseLeave={wo.holdEnd} onTouchEnd={wo.holdEnd} onTouchCancel={wo.holdEnd} style={s('width:54px; height:54px; flex:none; border:none; border-radius:16px; background:var(--surface-2); color:var(--text); cursor:pointer; font-size:26px; font-weight:600; font-family:inherit; user-select:none; -webkit-user-select:none;')}>+</button>

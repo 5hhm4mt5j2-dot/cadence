@@ -28,25 +28,30 @@ const dayTypeName = (type, dayKey, customLabels, withDay, label) => {
   if (!withDay) return typeLabel(type);
   return type === 'Rest' ? 'Rest day' : typeLabel(type) + ' day';
 };
+// Onboarding tour. Every `target` names a [data-tut] element that is always on the
+// home screen while the tour runs (greet, weather, theme, week, today, weight, supps,
+// nutri, menu); steps about screens the tour can't open have no target and show
+// centred instead of pointing at something that isn't there.
 const TUT_STEPS = [
-  { title: 'Welcome to Cadence', text: "Welcome to Cadence, your personal fitness companion. We'll walk you through every feature in just a few minutes. This app is built for tracking lifts, cardio, nutrition and recovery. Everything stays private on your device. Let's get started." },
-  { title: 'Your Profile', text: "This is your personal greeting. It changes throughout the day based on when you're training. Long-press it anytime to edit your profile, update your weight, age or training goals, and your daily nutrition targets adjust automatically.", target: 'greet' },
-  { title: 'Weather Widget', text: "This shows today's weather based on your location. It helps you plan outdoor activities like running or cycling. Tap it anytime to refresh or see a forecast. Your location is rounded for privacy and nothing leaves your device.", target: 'weather' },
-  { title: 'Lifts Card', text: "This is your workout for today. Tap it to log your lifts. You'll see every exercise in your program, log each set individually, and rest between sets with a built-in timer. The app learns your recovery patterns and adapts over time.", target: 'today' },
-  { title: 'Supplements Checklist', text: "Check off your daily supplements here. It's a simple checklist to help you stay consistent with your stack. Mark them as you take them throughout the day.", target: 'supps' },
-  { title: 'Nutrition Widget', text: "These are your daily nutrition targets. The bars fill up as you log meals. Green is protein, gold is carbs, terracotta is fat. The circle shows overall calorie progress. Your targets were calculated based on your profile and activity level.", target: 'nutri' },
-  { title: 'Weekly Calendar', text: "This is your training schedule for the week. Each circle represents a day. Green is a lift day, blue is cardio, gray is a rest day. Tap any day to see or edit that day's activities. You can see up to three weeks ahead or back in time to review past workouts.", target: 'week' },
-  { title: 'Swipe Navigation', text: "Swipe left to see next week or swipe right to see last week. It's smooth and fast. You can track your entire training history or plan weeks in advance.", target: 'week' },
-  { title: 'Tap a Day', text: "Tap any day to open its details. You'll see all the exercises for that day, your past performance if you've already trained, and options to edit or move activities around. Everything syncs across your calendar.", target: 'week' },
-  { title: 'Edit and Day Types', text: "Tap Edit to change a day's type. You can make it a Lift Day, Cardio Day or Rest Day. Add or remove exercises on the fly. If you change a recurring day, you can apply the change to just that week or to every instance of that day going forward.", target: 'today' },
-  { title: 'Set-by-Set Logging', text: "When you train, log each set individually. Tap the reps and weight fields and adjust with plus and minus buttons. After you log your last set, you'll rate how hard the workout felt on a scale of 1 to 10. The app tracks this to learn your recovery needs." },
-  { title: 'Rest Timer', text: "After each set, the rest timer starts automatically. It counts down visually with a circular progress bar. You can skip it, add 30 seconds, or subtract 30 seconds. When it completes, you'll feel a vibration and hear a sound. Your phone stays awake so you never miss the cue." },
-  { title: 'Idle Display Mode', text: "During rest, your screen dims to 30 percent brightness to save battery. The timer stays visible and bright. Your phone refreshes at 1 hertz so it's easier to read in bright gyms. Tap anywhere to wake the screen back up. This keeps your hands free for stretching or recovery." },
-  { title: 'Exercise Reordering', text: "Long-press the three-dot handle on the left side of any exercise to drag and reorder. The app saves your new order automatically. No need to confirm, just drag, drop and go. Useful when you want to adjust your warm-up or exercise flow." },
-  { title: 'Cardio and Sports Database', text: "Not just lifting. Open the Cardio menu to log running, cycling, rowing, machines and sports like tennis, padel or boxing. Each has its own settings for duration, intensity and recovery tracking. Mix and match with your lift days or go full cardio if that's your thing.", target: 'menu' },
-  { title: 'Meal Logging', text: "The Meals tab is where nutrition happens. You can search for foods by typing their name, take a photo of your meal to auto-recognize what's in it, or scan a barcode on any packaged food. All three methods pull real nutrition data so your macro tracking stays accurate.", target: 'nutri' },
-  { title: 'Barcode Scanning', text: "Tap the barcode button to scan any food packaging. Point your camera at the barcode and the app instantly looks it up. You'll see the food name, nutrition facts and serving size. Adjust the quantity if you're eating more or less than one serving, then tap Confirm. It's the fastest way to log packaged foods accurately." },
-  { title: 'Privacy, Backup and Feedback', text: "Your health data is stored locally on your device and never leaves the app. Nothing is encrypted or sent anywhere. You can export your data anytime as a backup and import it on a new device. Use the Feedback tab to report bugs or suggest features. Everything you do here is just for you. Ready to train?", target: 'menu', final: true },
+  { title: 'Welcome to Cadence', text: "Cadence tracks your lifts, cardio, meals, body weight and recovery in one place. This tour takes about two minutes and covers everything on the home screen and inside a workout." },
+  { title: 'Your profile', text: "Your greeting changes with the time of day. Long-press it to see your profile: edit your details and targets, view what Cadence has learned about your recovery, or back up and restore your data.", target: 'greet' },
+  { title: 'Weather', text: "Today's weather for your area, to help plan outdoor runs and rides. Tap it to refresh. If location is off, you can type a city instead.", target: 'weather' },
+  { title: 'Light and dark, automatically', text: "Cadence switches to dark mode at 19:00 and back to light at 07:00. Tap this button, or Appearance in the Menu, to pick the other look. Your choice holds until the next switch, then the automatic schedule takes over again.", target: 'theme' },
+  { title: 'Your week', text: "Each circle is a day: coloured for training, grey for rest. Tap a day to open it. Swipe left or right to look up to three weeks ahead or back.", target: 'week' },
+  { title: "Today's workout", text: "Open session takes you into today's workout. Move lift shifts it to another day in this week or a later one. Tap the workout name to change the day's type, add activities, or skip it this week.", target: 'today' },
+  { title: 'Logging sets', text: "Start workout steps through one set at a time. Each set starts from what you lifted last time. Use Fix last set to correct a set, the eye icon to see the whole session, and Restart to begin again. When you finish, rate your effort from 1 to 10." },
+  { title: 'Rest timer', text: "The rest timer starts after each set. Tap the ring to pause it, or use −30s, +30s and Skip rest. When it hits zero you'll hear a sound, and phones that support it vibrate. Set the rest length, sound and screen dimming under Menu → Workout Settings." },
+  { title: 'Supersets and dropsets', text: "Edit an exercise to pair it with another exercise from your day or anywhere in the Exercise Database. You go straight from one exercise to its partner, and the rest timer starts once you've done both. Turn on Dropset and Cadence asks for a lighter set after each working set." },
+  { title: 'Rep ranges', text: "Turn on Range next to Reps to plan something like 3 × 6–12. During the workout you'll see “Target 6–12” and log the reps you actually did. History, volume and progression always use the number you logged." },
+  { title: 'Bodyweight and timed holds', text: "Pull-ups, dips, push-ups and similar exercises count your body weight in volume, shown as “BW 82 kg”. Any weight you add, such as for a weighted pull-up, goes on top. Planks, dead hangs and wall sits are logged by time instead of reps." },
+  { title: 'Cardio', text: "Cardio is logged as distance, time and effort, from 1 to 10. Add running, cycling, rowing, machines or sports from a day's Edit menu or from Menu → Cardio Database. You can also add a second workout to a day, like an evening run after a morning lift." },
+  { title: 'Body weight', text: "Log your weight here each morning. Each weigh-in updates the weight in your profile and the weight used for bodyweight exercises. Every 14 days, Cadence compares your weight trend with what you've eaten and adjusts your calorie target.", target: 'weight' },
+  { title: 'Supplements', text: "Tick off your daily supplements here. The list resets at 3am, so a late-night dose still counts for the day you took it. Tap Edit to change the list.", target: 'supps' },
+  { title: 'Meals and macros', text: "The coloured rings fill as you log meals: protein, carbs and fat against your targets. Tap the card to open Meals, where you can search foods by name, describe a meal in text, snap a photo, or scan a barcode.", target: 'nutri' },
+  { title: 'Undo anything', text: "After you change something, an Undo button appears in the bottom-left corner. It reverses a logged set, a move, a skip, a deleted meal and more, one step at a time." },
+  { title: 'Program and Archive', text: "In the Menu, Current Program holds your weekly template: rename it, edit each day, view its history, or send it to the Archive. The Archive keeps past programs with the days you completed, and each one exports to PDF.", target: 'menu' },
+  { title: 'Rest mode', text: "Need time off? Turn on Rest mode in the Menu to hide scheduled workouts until you turn it off. Nothing is deleted.", target: 'menu' },
+  { title: 'Privacy and backup', text: "Your health data is stored locally on your device. Nothing leaves the app. Back it up from your profile (long-press the greeting) and restore it on a new device. You can replay this tour anytime from Menu → Replay Tutorial.", target: 'menu', final: true },
 ];
 const ONB_DEFAULTS = { name: '', sex: 'Male', age: '', height: '', weight: '', goal: 'Maintain', pace: 'Moderate', activity: 'Moderately Active' };
 
@@ -145,7 +150,7 @@ function archiveDaysFrom(sessions) {
   const byDay = {};
   (sessions || []).forEach(se => {
     const strip = (se.exercises || []).map(e => (e.cardio
-      ? { name: e.name, cardio: true, duration: e.duration, intensity: e.intensity }
+      ? { name: e.name, cardio: true, duration: e.duration, intensity: e.intensity, distance: e.distance, rpe: e.rpe }
       : { name: e.name, sets: e.sets, reps: e.reps, weight: e.weight }));
     const cur = byDay[se.day];
     if (!cur || (se.date || '') >= cur.date) byDay[se.day] = { day: se.day, type: se.type, label: se.label || '', date: se.date || '', exercises: strip };
@@ -202,12 +207,51 @@ const topWeight = (e) => {
   if (lg.length) return lg.reduce((a, l) => Math.max(a, l.weight || 0), 0);
   return e.weight || 0;
 };
+// ---- exercise kinds ----
+// Isometric holds are logged as a duration, not reps; bodyweight movements carry the
+// lifter's own weight as load, with anything entered as weight counted on top. Both are
+// read from an explicit flag when the exercise has one (`timed` / `bw`, set from the
+// exercise sheet) and otherwise from the name — which is what lets sessions saved before
+// these flags existed pick the right behaviour without a data migration.
+const TIMED_RE = /\b(plank|dead[- ]?hang|wall[- ]?sit|hollow(?: body)? hold|l[- ]?sit|isometric|hold)\b/i;
+const BW_RE = /\b(pull[- ]?ups?|chin[- ]?ups?|dips?|push[- ]?ups?|knee raises?|leg raises?|toes[- ]to[- ]bar|ab[- ]?(?:wheel|roll)|roll[- ]?outs?|sit[- ]?ups?|crunch(?:es)?|muscle[- ]?ups?|inverted rows?|back extensions?|mountain climbers?|dead bugs?|burpees?)\b/i;
+const NOT_BW_RE = /\b(cable|machine|assisted|smith|band)\b/i;
+const isTimed = (e) => !!e && !e.cardio && (e.timed != null ? !!e.timed : TIMED_RE.test(e.name || ''));
+const isBodyweight = (e) => !!e && !e.cardio && !isTimed(e) && (e.bw != null ? !!e.bw : (BW_RE.test(e.name || '') && !NOT_BW_RE.test(e.name || '')));
+// Seconds -> "0:45" / "1:30".
+const fmtSecs = (t) => { t = Math.max(0, Math.round(+t || 0)); return Math.floor(t / 60) + ':' + String(t % 60).padStart(2, '0'); };
+// "45", "1:30" or "1m30" -> seconds; NaN when it isn't a duration.
+const parseSecs = (raw) => {
+  const str = String(raw == null ? '' : raw).trim();
+  const m = /^(\d+)\s*(?::|m)\s*(\d{1,2})?\s*s?$/i.exec(str);
+  if (m) return parseInt(m[1], 10) * 60 + (m[2] ? parseInt(m[2], 10) : 0);
+  const n = parseFloat(str);
+  return Number.isNaN(n) ? NaN : Math.round(n);
+};
+// Target reps — "6–12" when the template holds a range, otherwise the fixed count. The
+// range is display-only: every number that is stored or summed is the logged rep count.
+const hasRange = (e) => !!e && e.repsMin != null && e.repsMax != null && e.repsMax > e.repsMin;
+const repTarget = (e) => (hasRange(e) ? (e.repsMin + '–' + e.repsMax) : String(e.reps || 0));
+// Weight column for a set: "BW", "BW+10kg" or "60kg".
+const loadLabel = (bwEx, weight) => (bwEx ? ('BW' + (weight ? '+' + weight + 'kg' : '')) : ((weight || 0) + 'kg'));
+
+// ---- cardio ----
+// Cardio is logged as distance, time and effort (RPE 1–10). Entries written before effort
+// existed only carry an Easy/Moderate/Hard intensity, which maps onto the RPE scale.
+const INTENSITY_RPE = { Easy: 3, Moderate: 5, Hard: 8 };
+const cardioRpe = (e) => (e.rpe != null && e.rpe !== '' ? +e.rpe : (INTENSITY_RPE[e.intensity || 'Moderate'] || 5));
+const rpeIntensity = (n) => (n <= 3 ? 'Easy' : (n <= 6 ? 'Moderate' : 'Hard'));
+const fmtKm = (km) => (+km > 0 ? (Math.round(+km * 100) / 100) + ' km' : '— km');
+const cardioLine = (e) => fmtKm(e.distance) + ' · ' + (e.duration || 0) + ' min · RPE ' + cardioRpe(e);
+
 // "62×8, 62×8, 60×7" for a logged exercise; the planned scheme when nothing was logged.
 const loggedLine = (e) => {
-  if (e.cardio) return (e.duration || 0) + ' min · ' + (e.intensity || 'Moderate');
+  if (e.cardio) return cardioLine(e);
   const lg = (e.logged || []).filter(l => !l.skipped);
-  if (!lg.length) return (e.sets || 0) + ' × ' + (e.reps || 0) + ' × ' + (e.weight || 0) + 'kg';
-  return lg.map(l => (l.weight || 0) + 'kg × ' + (l.reps || 0) + (l.drop ? ' ▾' + (l.drop.weight || 0) + '×' + (l.drop.reps || 0) : '')).join(', ');
+  if (!lg.length) return scheme(e);
+  if (isTimed(e)) return lg.map(l => fmtSecs(l.secs) + (l.weight ? ' +' + l.weight + 'kg' : '')).join(', ');
+  const bwEx = isBodyweight(e);
+  return lg.map(l => loadLabel(bwEx, l.weight) + ' × ' + (l.reps || 0) + (l.drop ? ' ▾' + (l.drop.weight || 0) + '×' + (l.drop.reps || 0) : '')).join(', ');
 };
 // "Superset with Barbell Row · dropset 80%" — the pairing notes shown under an exercise.
 const exerciseNotes = (e) => {
@@ -216,14 +260,40 @@ const exerciseNotes = (e) => {
   if (e.dropset && e.dropset.pct) parts.push('Dropset at ' + e.dropset.pct + '%');
   return parts.join(' · ');
 };
+// Load one set moved: the weight entered, plus body weight for a bodyweight exercise —
+// the body weight stamped on the set when it was logged, or today's for older sets and
+// for sets not logged yet.
+const setLoad = (l, bwEx, bwKg) => (l.weight || 0) + (bwEx ? (l.bw != null ? l.bw : (bwKg || 0)) : 0);
 // Volume counts the working set plus any dropset logged straight after it (#56).
-const setVol = (l) => (l.skipped ? 0 : ((l.reps || 0) * (l.weight || 0)) + (l.drop ? (l.drop.reps || 0) * (l.drop.weight || 0) : 0));
-const exVol = (e) => { if (e.cardio) return 0; const lg = e.logged || []; const sets = e.sets || 0; const t = (e.reps || 0) * (e.weight || 0); let v = 0; for (let i = 0; i < Math.max(sets, lg.length); i++) { const l = lg[i]; v += l ? setVol(l) : (i < sets ? t : 0); } return v; };
+const setVol = (l, bwEx, bwKg) => (l.skipped ? 0 : ((l.reps || 0) * setLoad(l, bwEx, bwKg)) + (l.drop ? (l.drop.reps || 0) * ((l.drop.weight || 0) + (bwEx ? (l.bw != null ? l.bw : (bwKg || 0)) : 0)) : 0));
+// sets × reps × load, logged sets first and the plan for the sets not logged yet. Cardio
+// and timed holds move no load in this sense, so they contribute nothing here — holds
+// are summed separately (exHoldSecs) and cardio has its own distance/time/effort.
+const exVol = (e, bwKg) => {
+  if (!e || e.cardio || isTimed(e)) return 0;
+  const bwEx = isBodyweight(e);
+  const lg = e.logged || []; const sets = e.sets || 0;
+  const t = (e.reps || 0) * ((e.weight || 0) + (bwEx ? (bwKg || 0) : 0));
+  let v = 0;
+  for (let i = 0; i < Math.max(sets, lg.length); i++) { const l = lg[i]; v += l ? setVol(l, bwEx, bwKg) : (i < sets ? t : 0); }
+  return v;
+};
+// Seconds held across a timed exercise — logged holds, else the planned ones.
+const exHoldSecs = (e) => {
+  if (!isTimed(e)) return 0;
+  const lg = (e.logged || []).filter(l => !l.skipped);
+  if (lg.length) return lg.reduce((a, l) => a + (l.secs || 0), 0);
+  return (e.sets || 0) * (e.holdSecs || 0);
+};
 // Numeric-input value: keep the field empty when cleared (so typing a fresh
 // digit replaces cleanly) instead of snapping back to a leading 0.
 const numOrEmpty = (raw, float) => { if (raw === '' || raw == null) return ''; const n = float ? parseFloat(raw) : parseInt(raw, 10); return Number.isNaN(n) ? '' : n; };
 const W_DEFAULTS = { rest: 90, vibrate: true, sound: 'ding', keepAwake: true, idleDelay: 10, idleDim: 30 };
-const scheme = (e) => e.cardio ? ((e.duration || 0) + ' min · ' + (e.intensity || 'Moderate')) : ((e.sets || 0) + ' × ' + (e.reps || 0) + ' × ' + (e.weight || 0) + 'kg');
+function scheme(e) {
+  if (e.cardio) return cardioLine(e);
+  if (isTimed(e)) return (e.sets || 0) + ' × ' + (e.holdSecs ? fmtSecs(e.holdSecs) + ' hold' : 'hold') + (e.weight ? ' +' + e.weight + 'kg' : '');
+  return (e.sets || 0) + ' × ' + repTarget(e) + ' × ' + loadLabel(isBodyweight(e), e.weight);
+}
 
 function seedSessions(week, program) {
   const s = {};
@@ -456,6 +526,8 @@ export {
   PACES,
   migrateCardioDb, fmt, fmtDate, fmtDateShort, MONTH_ABBR, migrateArchive, exVol, W_DEFAULTS, scheme,
   weekStartISO, daySpan, KCAL_PER_KG, topWeight, loggedLine, exerciseNotes,
+  isTimed, isBodyweight, fmtSecs, parseSecs, hasRange, repTarget, loadLabel, setVol, setLoad, exHoldSecs,
+  cardioRpe, rpeIntensity, cardioLine, fmtKm,
   seedSessions, seedExerciseDb, migrateExerciseDb, eqToOptions, eqLabel, KEY, BODY_PARTS,
   PLATE, MACRO_COLORS, ACTIVITY, ACTIVITY_MULT, GOALS, GOAL_RULES, DEFAULT_RECOVERY,
   RPE_SCALE, FOOD_DB, fmtKcal, mealMacroLine, GPU, itemMacros, sumItems, timeLabel,

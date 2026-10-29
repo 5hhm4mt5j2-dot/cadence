@@ -18,7 +18,7 @@ export default function TopBar({ v }) {
           </button>
         )}
         {v.onWeek && (
-          <button onClick={v.toggleTheme} aria-label="Toggle dark mode" style={s('width:44px; height:44px; border-radius:12px; border:1px solid var(--border); background:var(--surface); cursor:pointer; display:flex; align-items:center; justify-content:center; padding:0; color:var(--text); flex:none;')}>
+          <button onClick={v.toggleTheme} data-tut="theme" aria-label="Toggle dark mode" style={s('width:44px; height:44px; border-radius:12px; border:1px solid var(--border); background:var(--surface); cursor:pointer; display:flex; align-items:center; justify-content:center; padding:0; color:var(--text); flex:none;')}>
             {v.isDark && <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 13.2A8 8 0 1 1 10.8 4 6.3 6.3 0 0 0 20 13.2z"></path></svg>}
             {v.notDark && <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="4.5"></circle><path d="M12 2.5v2.5M12 19v2.5M4.2 4.2l1.8 1.8M18 18l1.8 1.8M2.5 12H5M19 12h2.5M4.2 19.8 6 18M18 6l1.8-1.8"></path></svg>}
           </button>

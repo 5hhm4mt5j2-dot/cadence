@@ -223,3 +223,88 @@ Three layers, because no single one covers every install:
 **Manual check:** rotate the phone → the rotate prompt appears and the UI underneath is
 untappable; rotate back → it disappears. On an installed Android PWA the screen should not
 rotate at all.
+
+
+## Volume, supersets, holds, bodyweight and cardio
+
+**Volume** is `sets × reps × load` per exercise (`exVol` in `src/lib/data.js`), logged sets
+first and the plan for sets not logged yet, dropsets included. The controller always calls
+it through `this.exVol(e)`, which supplies today's body weight. Two kinds are worked out
+from the exercise itself, from an explicit `timed` / `bw` flag when it has one (set by the
+toggles in the exercise sheet) and otherwise from the name. Data saved before the flags
+existed therefore needs no migration:
+
+- **Timed holds** (`isTimed`: plank, side plank, dead hang, wall sit, hollow hold, L-sit):
+  the template has `holdSecs`, and each logged set stores `secs` in place of `reps`. Holds
+  add nothing to kg volume; their time is summed separately (`exHoldSecs`) and shows as
+  "0:45 hold" / "Time in holds".
+- **Bodyweight** (`isBodyweight`: pull-ups, chin-ups, dips, push-ups, knee/leg raises, ab
+  rollouts, etc.; anything named cable/machine/assisted is excluded): load = body weight +
+  the weight entered, so the weight field means *added* weight ("BW", "BW+10kg"). Body
+  weight is the most recent weigh-in, else the profile weight (`bodyweightKg()`). Each
+  logged set is stamped with `bw` so later weigh-ins don't rewrite old volume. Sets logged
+  before this change have no stamp and use today's body weight.
+
+**Supersets** are linked by `supersetWith`, and the link now counts in both directions
+(`_supersetGroup`). Before, a pair saved from the second exercise was invisible from the
+first, so the rest timer came up between partners. A superset is worked in rounds: each
+member's set goes straight on to the next member's, and the rest timer runs only after the
+last member of the round. `_nextPos` resumes mid-round on whichever member is behind. In
+the exercise sheet, *Superset with another exercise* offers the day's exercises plus
+**+ From database**. A partner picked there is added to the day straight after the
+exercise, paired both ways, in the same save. Deleting one half clears the other's link.
+
+**Rep ranges.** The sheet's **Range** toggle stores `repsMin`/`repsMax` as a display-only
+target (`reps` keeps the low end so planned volume stays a number). The set logger shows
+"Target 6–12" above the reps input. History, volume and progression only ever see the
+logged count.
+
+**Cardio** is distance (km), time (min) and effort (RPE 1–10): `distance`, `duration`,
+`rpe`, entered through the shared `CardioFields` block in the exercise sheet, quick add,
+the cardio-database sheet, the post-workout rating sheet and bulk edit. Older entries only
+have `intensity`, which maps onto RPE (Easy 3, Moderate 5, Hard 8). `intensity` is still
+written alongside for older readers.
+
+**Manual check:** add Bench Press, turn on Superset, pick *Bent-Over Barbell Row* from the
+database, save, and both appear paired. Start the workout: logging Bench goes straight to
+the Row, and the rest timer comes up only after the Row.
+
+
+## Archive and PDF
+
+The Archive counts **completed days only** (`recordCompleted`): a record that was
+un-completed, or that holds no work (no logged set, no planned load, no hold, no cardio
+time or distance), is left out of the list, the totals, "what was in this program" and the
+PDF. Rest days never appear. Un-completing a session now removes this week's history
+record, rather than leaving it behind to be archived.
+
+*Export PDF* (current program and archived programs) builds a real PDF with jsPDF
+(`src/lib/pdf.js`, loaded on demand and preloaded when the screen opens) and downloads it.
+In an installed PWA it goes to the share sheet instead. The old path called
+`window.print()`, which an installed iOS PWA ignores without any error, so the button
+looked dead. Failures are logged and shown in a toast. The nutrition export still prints.
+
+
+## Theme, rest-timer chime, tutorial
+
+**Theme** follows the clock: dark from 19:00 to 07:00, light otherwise, checked on load,
+every minute and on return from the background. The header toggle or Menu → Appearance
+overrides it until the next 07:00/19:00 boundary (`lt_theme_until`), and then the schedule
+takes over again. An override saved by an older build has no end time and lapses straight
+away.
+
+**Rest-timer chime.** The sound is synthesised, with no audio file involved. It never
+played because the AudioContext was first created when the timer ran out, outside any user
+gesture, so the browser kept it suspended. The Start / Log / Start-set taps now unlock
+audio ahead of time: they resume the AudioContext and prime an `<audio>` element with a
+silent play. At zero, the chime plays as a generated WAV through that element. This is
+media playback, which iOS doesn't mute with the silent switch the way it mutes Web Audio,
+and on iOS 17+ `navigator.audioSession.type = 'playback'` is also set. If the element is
+refused, it falls back to the oscillators. Every rejection is logged with `console.warn`,
+and the phone vibrates where `navigator.vibrate` exists.
+
+**Tutorial** (`TUT_STEPS`, 19 steps) covers the current app. Every `target` is a
+`[data-tut]` element that is always on the home screen while the tour runs (greet,
+weather, theme, week, today, weight, supps, nutri, menu), and the spotlight scrolls the
+target into view first. Steps about screens the tour can't open have no target and are
+shown centred. You can replay it from Menu → Replay Tutorial.
