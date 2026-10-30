@@ -203,9 +203,7 @@ export default class App extends React.Component {
   // Supplements roll over at 03:00 local (not midnight) so before-bed doses (ZMA etc.)
   // logged after midnight aren't wiped. Shift "now" back 3h, then take the local date.
   supplementDayKey() {
-    const shifted = new Date(Date.now() - 3 * 3600 * 1000);
-    const pad = (n) => String(n).padStart(2, '0');
-    return shifted.getFullYear() + '-' + pad(shifted.getMonth() + 1) + '-' + pad(shifted.getDate());
+    return localISO(Date.now() - 3 * 3600 * 1000);
   }
 
   checkSupplementsReset() {
@@ -403,7 +401,7 @@ export default class App extends React.Component {
     const str = JSON.stringify(backup, null, 2);
     const blob = new Blob([str], { type: 'application/json' });
     const d = new Date(), pad = (n) => String(n).padStart(2, '0');
-    const fn = 'cadence-backup-' + d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + '-' + pad(d.getHours()) + '-' + pad(d.getMinutes()) + '-' + pad(d.getSeconds()) + '.json';
+    const fn = 'cadence-backup-' + localISO(d) + '-' + pad(d.getHours()) + '-' + pad(d.getMinutes()) + '-' + pad(d.getSeconds()) + '.json';
     try {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a'); a.href = url; a.download = fn;
@@ -715,19 +713,13 @@ export default class App extends React.Component {
     return mon;
   }
 
-  weekKey(offset) {
-    const m = this.weekMonday(offset);
-    const pad = (n) => String(n).padStart(2, '0');
-    return m.getFullYear() + '-' + pad(m.getMonth() + 1) + '-' + pad(m.getDate());
-  }
+  weekKey(offset) { return localISO(this.weekMonday(offset)); }
 
   // ISO date for a given weekday within the week at `offset`.
   weekDayISO(offset, day) {
     const mon = this.weekMonday(offset);
     const i = DAYS.indexOf(day);
-    const dt = new Date(mon.getFullYear(), mon.getMonth(), mon.getDate() + i);
-    const pad = (n) => String(n).padStart(2, '0');
-    return dt.getFullYear() + '-' + pad(dt.getMonth() + 1) + '-' + pad(dt.getDate());
+    return localISO(new Date(mon.getFullYear(), mon.getMonth(), mon.getDate() + i));
   }
 
   // Was a session actually LOGGED for this weekday during the current calendar week?
@@ -865,10 +857,8 @@ export default class App extends React.Component {
     });
     if (offset < 0) {
       const mon = this.weekMonday(offset);
-      const pad = (n) => String(n).padStart(2, '0');
-      const iso = (dt) => dt.getFullYear() + '-' + pad(dt.getMonth() + 1) + '-' + pad(dt.getDate());
       const dayDates = {};
-      DAYS.forEach((d, i) => { dayDates[iso(new Date(mon.getFullYear(), mon.getMonth(), mon.getDate() + i))] = d; });
+      DAYS.forEach((d, i) => { dayDates[localISO(new Date(mon.getFullYear(), mon.getMonth(), mon.getDate() + i))] = d; });
       // Days before the current program started belong to the OLD program:
       // never project the new template backwards — show only what actually happened.
       const startISO = s.programStartDate || '';
@@ -2364,7 +2354,6 @@ export default class App extends React.Component {
   }
 
   initWeather() {
-    if (this.props.weatherCondition && this.props.weatherCondition !== 'auto') { this.setState({ weatherStatus: 'ready' }); return; }
     try {
       const c = JSON.parse(localStorage.getItem('lt_weather_cache') || 'null');
       if (c && c.data && (Date.now() - c.ts) < 30 * 60 * 1000) { this.setState({ weatherData: c.data, weatherStatus: 'ready' }); return; }
@@ -2416,7 +2405,6 @@ export default class App extends React.Component {
   }
 
   maybeRefreshWeather() {
-    if (this.props.weatherCondition && this.props.weatherCondition !== 'auto') return;
     let stale = true;
     try {
       const c = JSON.parse(localStorage.getItem('lt_weather_cache') || 'null');
@@ -2426,7 +2414,6 @@ export default class App extends React.Component {
   }
 
   refreshWeather() {
-    if (this.props.weatherCondition && this.props.weatherCondition !== 'auto') { this.setState({ weatherStatus: 'ready' }); return; }
     try { localStorage.removeItem('lt_weather_cache'); } catch (e) {}
     this.setState({ weatherStatus: 'loading', weatherError: '' });
     this._wxMinShimmer = Date.now();
@@ -2575,18 +2562,11 @@ export default class App extends React.Component {
     const dayIdx = Math.floor((now - new Date(now.getFullYear(), 0, 0)) / 86400000) % 4;
     const baseCond = ['sunny', 'cloudy', 'rainy', 'snowy'][dayIdx];
     const autoCond = isNightTime ? (baseCond === 'sunny' ? 'clear-night' : baseCond + '-night') : baseCond;
-    const TEMP = { sunny: 24, cloudy: 18, rainy: 15, snowy: 1, 'clear-night': 17, 'cloudy-night': 16, 'rainy-night': 13, 'snowy-night': -1 };
-    const LABEL = { sunny: 'Sunny', cloudy: 'Partly Cloudy', rainy: 'Rainy', snowy: 'Snowy', 'clear-night': 'Clear Night', 'cloudy-night': 'Partly Cloudy', 'rainy-night': 'Rainy', 'snowy-night': 'Snowy' };
-    // Tweak override forces a demo condition; otherwise use live Open-Meteo data.
-    const wxOverride = this.props.weatherCondition && this.props.weatherCondition !== 'auto';
+    // Live Open-Meteo data; until it arrives the icon shows a placeholder condition.
     const wd = s.weatherData;
-    const wxStatus = wxOverride ? 'ready' : (s.weatherStatus || 'loading');
+    const wxStatus = s.weatherStatus || 'loading';
     let cond, tempLabel, condLabel, location, high, low, sunrise, sunset;
-    if (wxOverride) {
-      cond = this.props.weatherCondition;
-      tempLabel = TEMP[cond] + '°'; condLabel = LABEL[cond]; location = 'Nicosia';
-      high = TEMP[cond] + 5; low = TEMP[cond] - 6; sunrise = '6:12'; sunset = '19:48';
-    } else if (wd) {
+    if (wd) {
       cond = wd.cond; tempLabel = wd.temp + '°'; condLabel = wd.condLabel; location = wd.city;
       high = wd.high; low = wd.low; sunrise = wd.sunrise; sunset = wd.sunset;
     } else {

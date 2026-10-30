@@ -11,9 +11,9 @@ try {
   if (so && so.lock) so.lock('portrait').catch(() => {});
 } catch (e) { /* unsupported — the CSS fallback covers it */ }
 
-// Defaults mirror the Claude Design export's data-props (weatherCondition, usdaApiKey).
+// Mirrors the Claude Design export's data-prop (usdaApiKey).
 // The USDA FoodData Central key comes from the VITE_USDA_API_KEY env var (see
 // .env.local) and is embedded at build time — never hardcode it here.
 createRoot(document.getElementById('root')).render(
-  <App weatherCondition="auto" usdaApiKey={import.meta.env.VITE_USDA_API_KEY || ''} />,
+  <App usdaApiKey={import.meta.env.VITE_USDA_API_KEY || ''} />,
 )
