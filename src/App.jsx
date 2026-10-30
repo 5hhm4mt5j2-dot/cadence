@@ -7,7 +7,7 @@
 import React from 'react';
 import {
   DAYS, FULL, TYPES, TYPE_COLOR, TYPE_TINT, DUMBBELL, SNEAKER, HEART, MOON, TYPE_ICON,
-  INTENSITIES, typeLabel, dayTypeName, TUT_STEPS, ONB_DEFAULTS, DEFAULT_EX, CARDIO_TYPES, seedCardioDb,
+  typeLabel, dayTypeName, TUT_STEPS, ONB_DEFAULTS, DEFAULT_EX, CARDIO_TYPES, seedCardioDb,
   PACES,
   migrateCardioDb, fmt, fmtDate, fmtDateShort, migrateArchive, exVol, W_DEFAULTS, scheme,
   weekStartISO, daySpan, KCAL_PER_KG, localISO, fixUtcDates, topWeight, loggedLine, exerciseNotes,
@@ -67,7 +67,6 @@ export default class App extends React.Component {
       programStartDate: localISO(),
       programName: 'Program 1',
       programRename: null,
-      programPrint: null,
       archiveId: null,
       moveOpen: false,
       moveSrc: null,
@@ -287,7 +286,8 @@ export default class App extends React.Component {
     this._scrollRoot.addEventListener('scroll', this._onAnyScroll, { capture: true, passive: true });
   }
   componentWillUnmount() {
-    clearTimeout(this._loadTimer); clearInterval(this._autoTimer); clearInterval(this._themeTimer); clearTimeout(this._midnightT); this._ptrDetach && this._ptrDetach();
+    clearTimeout(this._loadTimer); clearInterval(this._autoTimer); clearInterval(this._themeTimer); clearTimeout(this._midnightT);
+    clearTimeout(this._toastT); clearTimeout(this._lp); clearTimeout(this._greetLp); clearTimeout(this._tutMeasureT); clearTimeout(this._searchTimer); this._ptrDetach && this._ptrDetach();
     clearInterval(this._woTick); clearTimeout(this._woIdleT); this._woHoldEnd();
     try { this._wl && this._wl.release(); } catch (e) {}
     try { document.removeEventListener('visibilitychange', this._woVis); } catch (e) {}
@@ -1186,15 +1186,6 @@ export default class App extends React.Component {
     return list.filter((e, i) => !e.cardio && i !== f.index && e.name && e.name !== f.name).map(e => e.name);
   }
 
-  syncProgramExercise(day, index, item) {
-    const p = this.state.program[day];
-    if (!p) return this.state.program;
-    const exercises = (p.exercises || []).slice();
-    if (index === null || index >= exercises.length) exercises.push({ ...item });
-    else exercises[index] = { ...item };
-    return { ...this.state.program, [day]: { ...p, exercises } };
-  }
-
   removeProgramExerciseAt(day, index) {
     const p = this.state.program[day];
     if (!p) return this.state.program;
@@ -1210,8 +1201,18 @@ export default class App extends React.Component {
   // The most recent non-skipped set logged for an exercise name, across logged history
   // and archived programs — so repeating a workout starts from what was actually lifted
   // last time rather than the template's number.
+  // Memoised per name until sessionHistory / archive change: the set logger asks on every
+  // render, and the rest timer re-renders once a second.
   lastUsedFor(name) {
     if (!name) return null;
+    const sh = this.state.sessionHistory, ar = this.state.archive;
+    const m = this._luMemo;
+    if (!m || m.sh !== sh || m.ar !== ar) this._luMemo = { sh, ar, by: {} };
+    const by = this._luMemo.by;
+    if (!(name in by)) by[name] = this._lastUsedScan(name);
+    return by[name];
+  }
+  _lastUsedScan(name) {
     const recs = (this.state.sessionHistory || []).concat((this.state.archive || []).flatMap(w => w.sessions || []));
     let best = null;
     recs.forEach(r => {
@@ -2975,13 +2976,13 @@ export default class App extends React.Component {
     const efTimed = ef0 ? this._formTimed(ef0) : false;
     const efBw = ef0 ? this._formBw(ef0) : false;
     const efPick = ef0 && ef0.pickPartner;
+    const efPartners = efPick ? this._dbPartnerList(ef0) : [];
     const ef = ef0 ? {
       heading: ef0.index === null ? 'Add exercise' : (ef0.cardio ? 'Edit cardio' : 'Edit exercise'),
       isCardio: !!ef0.cardio, isStrength: !ef0.cardio,
       nameLabel: ef0.cardio ? 'Activity' : 'Exercise',
       name: ef0.name, sets: ef0.sets, reps: ef0.reps, weight: ef0.weight,
       duration: ef0.duration, intensity: ef0.intensity,
-      intensities: INTENSITIES.map(x => ({ label: x, bg: ef0.intensity === x ? TYPE_COLOR.Cardio : 'var(--surface-2)', color: ef0.intensity === x ? '#fff' : 'var(--text)', pick: () => this.setState({ exForm: { ...this.state.exForm, intensity: x } }) })),
       volume: efTimed ? (fmtSecs((ef0.sets || 0) * (ef0.holdSecs || 0)) + ' held') : fmt(this.exVol(this._exItemFromForm(ef0))),
       volumeLabel: efTimed ? 'Planned hold time' : 'Exercise volume',
       deleteDisplay: ef0.index === null ? 'none' : 'block',
@@ -2995,7 +2996,7 @@ export default class App extends React.Component {
       // ---- #4 / #5 timed holds and bodyweight ----
       timedOn: efTimed, notTimed: !efTimed,
       toggleTimed: () => { const f = this.state.exForm; if (f) setEf({ timed: !this._formTimed(f) }); },
-      holdSecs: ef0.holdSecs, holdLabel: fmtSecs(ef0.holdSecs || 0),
+      holdSecs: ef0.holdSecs,
       onHoldSecs: (e) => { const v = e.target.value; setEf({ holdSecs: v === '' ? '' : (Number.isNaN(parseSecs(v)) ? this.state.exForm.holdSecs : parseSecs(v)) }); },
       bwOn: efBw,
       toggleBw: () => { const f = this.state.exForm; if (f) setEf({ bw: !this._formBw(f) }); },
@@ -3041,13 +3042,13 @@ export default class App extends React.Component {
         color: (efPick.cat || null) === b.key ? '#fff' : 'var(--text)',
         pick: () => setEf({ pickPartner: { ...(this.state.exForm.pickPartner || {}), cat: b.key } }),
       })) : [],
-      partnerList: efPick ? this._dbPartnerList(ef0).map((x, i, arr) => ({
+      partnerList: efPartners.map((x, i, arr) => ({
         name: x.name, part: x.part,
         onDay: efPairs0.indexOf(x.name) >= 0,
         divider: i === arr.length - 1 ? 'transparent' : 'var(--border)',
         pick: () => setEf({ supersetWith: x.name, pickPartner: null }),
-      })) : [],
-      partnerEmpty: !!efPick && this._dbPartnerList(ef0).length === 0,
+      })),
+      partnerEmpty: !!efPick && efPartners.length === 0,
       partnerAddNote: (ef0.supersetWith && efPairs0.indexOf(ef0.supersetWith) < 0) ? (ef0.supersetWith + ' will be added to this day as its superset partner.') : '',
       supersetChoices: efPairs.map(n => ({
         label: n,
@@ -3055,13 +3056,11 @@ export default class App extends React.Component {
         color: ef0.supersetWith === n ? '#fff' : 'var(--text)',
         pick: () => this.setState({ exForm: { ...this.state.exForm, supersetWith: n } }),
       })),
-      hasSupersetChoices: efPairs.length > 0,
       dropsetOn: !!ef0.dropset,
       toggleDropset: () => {
         const f = this.state.exForm; if (!f) return;
         this.setState({ exForm: { ...f, dropset: f.dropset ? null : { pct: 80 } } });
       },
-      dropPct: ef0.dropset ? ef0.dropset.pct : 80,
       dropPcts: [60, 70, 80, 90].map(pc => ({
         label: pc + '%',
         bg: (!!ef0.dropset && ef0.dropset.pct === pc) ? 'var(--accent)' : 'var(--surface-2)',
@@ -4099,7 +4098,6 @@ export default class App extends React.Component {
           confPct: Math.round(conf * 100) + '%',
           confBarW: Math.round(conf * 100) + '%',
           statusLine: recalibrating ? 'Recalibrating — you\'ve been away a while' : (prof.sample_size < 5 ? 'Still learning your patterns…' : prof.sample_size < 10 ? 'Emerging pattern detected' : prof.sample_size < 20 ? 'Based on your patterns' : 'Confident in your tolerance'),
-          samples: prof.sample_size,
           hasLog: log.length > 0,
           noLog: log.length === 0,
           entries: log.map(e => ({
@@ -4187,8 +4185,6 @@ export default class App extends React.Component {
       startWorkout: () => this.startWorkout(),
       printNutrition: !!s.nutritionPrint,
       np: s.nutritionPrint,
-      printProgram: !!s.programPrint && !s.nutritionPrint,
-      pp: s.programPrint,
       showAmend: (screen === 'session' && !!ad) || (screen === 'programDay' && !!apd),
       amendAction: () => {
         if (screen === 'programDay' && apd) this.setState({ dayMenu: { day: apd, scope: 'every', source: 'program' }, dayConfirm: null });

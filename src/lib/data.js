@@ -21,7 +21,6 @@ const SNEAKER = 'M2 16.5h20a0 0 0 0 1 0 0v1.5a1.5 1.5 0 0 1-1.5 1.5H3.5A1.5 1.5 
 const HEART = 'M12 20.3l-1.45-1.32C5.4 14.24 2 11.16 2 7.5 2 4.42 4.42 2 7.5 2c1.74 0 3.41.81 4.5 2.09C13.09 2.81 14.76 2 16.5 2 19.58 2 22 4.42 22 7.5c0 3.66-3.4 6.74-8.55 11.48z';
 const MOON = 'M20 13.2A8 8 0 1 1 10.8 4 6.3 6.3 0 0 0 20 13.2z';
 const TYPE_ICON = { Push: DUMBBELL, Pull: DUMBBELL, Legs: DUMBBELL, Cardio: HEART, Custom: DUMBBELL, Rest: MOON };
-const INTENSITIES = ['Easy', 'Moderate', 'Hard'];
 const typeLabel = (t) => t === 'Legs' ? 'Leg' : t;
 // Display label for a day's type. A Custom day shows the user's own name
 // (customLabels[dayKey]) instead of the literal word "Custom". A moved session
@@ -524,35 +523,6 @@ const RPE_SCALE = [
   { n: 9, label: 'Very intense', sub: 'Near failure' },
   { n: 10, label: 'Maximal', sub: 'Absolute limit' },
 ];
-// per 100g: kcal, protein, carbs, fat
-const FOOD_DB = [
-  { name: 'Chicken breast (cooked)', cal: 165, p: 31, c: 0, f: 3.6 },
-  { name: 'White rice (cooked)', cal: 130, p: 2.7, c: 28, f: 0.3 },
-  { name: 'Brown rice (cooked)', cal: 112, p: 2.3, c: 24, f: 0.8 },
-  { name: 'Egg (whole)', cal: 155, p: 13, c: 1.1, f: 11 },
-  { name: 'Oats (dry)', cal: 389, p: 17, c: 66, f: 7 },
-  { name: 'Banana', cal: 89, p: 1.1, c: 23, f: 0.3 },
-  { name: 'Apple', cal: 52, p: 0.3, c: 14, f: 0.2 },
-  { name: 'Whole milk', cal: 61, p: 3.2, c: 4.8, f: 3.3 },
-  { name: 'Greek yogurt', cal: 97, p: 9, c: 3.9, f: 5 },
-  { name: 'Salmon (cooked)', cal: 208, p: 20, c: 0, f: 13 },
-  { name: 'Beef mince 5% (cooked)', cal: 137, p: 21, c: 0, f: 5 },
-  { name: 'Tuna (canned in water)', cal: 116, p: 26, c: 0, f: 1 },
-  { name: 'Pasta (cooked)', cal: 158, p: 5.8, c: 31, f: 0.9 },
-  { name: 'White bread', cal: 265, p: 9, c: 49, f: 3.2 },
-  { name: 'Potato (boiled)', cal: 87, p: 1.9, c: 20, f: 0.1 },
-  { name: 'Sweet potato (baked)', cal: 86, p: 1.6, c: 20, f: 0.1 },
-  { name: 'Olive oil', cal: 884, p: 0, c: 0, f: 100 },
-  { name: 'Peanut butter', cal: 588, p: 25, c: 20, f: 50 },
-  { name: 'Whey protein powder', cal: 400, p: 80, c: 8, f: 6 },
-  { name: 'Broccoli', cal: 34, p: 2.8, c: 7, f: 0.4 },
-  { name: 'Avocado', cal: 160, p: 2, c: 9, f: 15 },
-  { name: 'Cheddar cheese', cal: 403, p: 25, c: 1.3, f: 33 },
-  { name: 'Halloumi', cal: 321, p: 22, c: 2.2, f: 25 },
-  { name: 'Almonds', cal: 579, p: 21, c: 22, f: 50 },
-  { name: 'Honey', cal: 304, p: 0.3, c: 82, f: 0 },
-  { name: 'Lentils (cooked)', cal: 116, p: 9, c: 20, f: 0.4 },
-];
 const fmtKcal = (n) => Math.round(n).toLocaleString();
 const mealMacroLine = (m) => 'P ' + Math.round(m.protein) + 'g · C ' + Math.round(m.carbs) + 'g · F ' + Math.round(m.fat) + 'g · ' + fmtKcal(m.calories) + ' kcal';
 const GPU = (it) => it.unit === 'oz' ? 28.35 : 1;
@@ -562,14 +532,14 @@ const timeLabel = (ts) => new Date(ts).toLocaleTimeString('en-US', { hour: 'nume
 
 export {
   DAYS, FULL, TYPES, TYPE_COLOR, TYPE_TINT, DUMBBELL, SNEAKER, HEART, MOON, TYPE_ICON,
-  INTENSITIES, typeLabel, dayTypeName, TUT_STEPS, ONB_DEFAULTS, DEFAULT_EX, CARDIO_TYPES, seedCardioDb,
+  typeLabel, dayTypeName, TUT_STEPS, ONB_DEFAULTS, DEFAULT_EX, CARDIO_TYPES, seedCardioDb,
   PACES,
-  migrateCardioDb, fmt, fmtDate, fmtDateShort, MONTH_ABBR, migrateArchive, exVol, W_DEFAULTS, scheme,
+  migrateCardioDb, fmt, fmtDate, fmtDateShort, migrateArchive, exVol, W_DEFAULTS, scheme,
   weekStartISO, daySpan, KCAL_PER_KG, localISO, fixUtcDates, topWeight, loggedLine, exerciseNotes,
-  isTimed, isBodyweight, fmtSecs, parseSecs, hasRange, repTarget, loadLabel, setVol, setLoad, exHoldSecs,
-  cardioRpe, rpeIntensity, cardioLine, fmtKm,
+  isTimed, isBodyweight, fmtSecs, parseSecs, hasRange, repTarget, loadLabel, setVol, exHoldSecs,
+  cardioRpe, rpeIntensity, cardioLine,
   seedSessions, seedExerciseDb, migrateExerciseDb, eqToOptions, eqLabel, KEY, BODY_PARTS,
   PLATE, MACRO_COLORS, ACTIVITY, ACTIVITY_MULT, GOALS, GOAL_RULES, DEFAULT_RECOVERY,
-  RPE_SCALE, FOOD_DB, fmtKcal, mealMacroLine, GPU, itemMacros, sumItems, timeLabel,
+  RPE_SCALE, fmtKcal, mealMacroLine, GPU, itemMacros, sumItems, timeLabel,
   numOrEmpty,
 };
