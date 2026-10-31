@@ -235,6 +235,23 @@ function fixUtcDates(d) {
   }
   return { ...d, sessionHistory, archive, meals, weights };
 }
+// Superset links left pointing at an exercise that is no longer on the day (removed or
+// renamed by an older build) are dropped on load, so they can't resurrect the partner
+// the next time the exercise is edited. Idempotent; same objects back when clean.
+function repairSupersets(d) {
+  const fixDay = (x) => { if (!x || !Array.isArray(x.exercises)) return x; const ex = pruneSupersets(x.exercises); return ex === x.exercises ? x : { ...x, exercises: ex }; };
+  const fixMap = (m) => {
+    if (!m || typeof m !== 'object') return m;
+    let ch = false; const out = {};
+    Object.keys(m).forEach(k => {
+      let x = fixDay(m[k]);
+      if (x && x.extra) { const xe = fixDay(x.extra); if (xe !== x.extra) x = { ...x, extra: xe }; }
+      if (x !== m[k]) ch = true; out[k] = x;
+    });
+    return ch ? out : m;
+  };
+  return { ...d, sessions: fixMap(d.sessions), program: fixMap(d.program) };
+}
 // Inclusive day span between two ISO dates.
 const daySpan = (a, b) => Math.max(1, Math.round((new Date(b + 'T00:00:00') - new Date(a + 'T00:00:00')) / 86400000) + 1);
 const fmtDateShort = (iso) => { try { return new Date(iso + 'T00:00:00').toLocaleDateString('en-US', { day: 'numeric', month: 'short' }); } catch (e) { return iso; } };
@@ -292,10 +309,54 @@ const loggedLine = (e) => {
   const bwEx = isBodyweight(e);
   return lg.map(l => loadLabel(bwEx, l.weight) + ' × ' + (l.reps || 0) + (l.drop ? ' ▾' + (l.drop.weight || 0) + '×' + (l.drop.reps || 0) : '')).join(', ');
 };
+// #56 — superset membership for a day's list, with `supersetWith` read in both directions
+// (a link saved on either member pairs them, and chains join into one group). Returns,
+// per exercise, the names of the other members — [] outside a superset. A link to an
+// exercise that isn't on the list is ignored rather than trusted.
+const supersetPartners = (exs) => {
+  const list = exs || [];
+  const root = list.map((_, i) => i);
+  const find = (i) => (root[i] === i ? i : (root[i] = find(root[i])));
+  const lift = (x) => !!x && !x.cardio && !!x.name;
+  list.forEach((x, i) => {
+    if (!lift(x) || !x.supersetWith) return;
+    list.forEach((y, j) => { if (j !== i && lift(y) && y.name === x.supersetWith) root[find(j)] = find(i); });
+  });
+  return list.map((x, i) => (lift(x) ? list.filter((y, j) => j !== i && lift(y) && find(j) === find(i)).map(y => y.name) : []));
+};
+// The list in reading order for a report: each superset's members pulled together at
+// the first member's position, everything else where it was. Items are
+// { e, i (original index), partners }.
+const groupSupersets = (exs) => {
+  const list = exs || [];
+  const partners = supersetPartners(list);
+  const placed = {}; const out = [];
+  list.forEach((e, i) => {
+    if (placed[i]) return;
+    placed[i] = true; out.push({ e, i, partners: partners[i] });
+    if (!partners[i].length) return;
+    list.forEach((y, j) => { if (!placed[j] && partners[i].indexOf(y && y.name) >= 0) { placed[j] = true; out.push({ e: y, i: j, partners: partners[j] }); } });
+  });
+  return out;
+};
+// Drops `supersetWith` links that point at nothing on the list (the partner was removed
+// or renamed by an older build). Returns the same array when nothing needed fixing.
+const pruneSupersets = (exs) => {
+  if (!Array.isArray(exs)) return exs;
+  let changed = false;
+  const out = exs.map(x => {
+    if (!x || !x.supersetWith) return x;
+    if (!x.cardio && exs.some(y => y !== x && y && !y.cardio && y.name === x.supersetWith && y.name !== x.name)) return x;
+    changed = true; const c = { ...x }; delete c.supersetWith; return c;
+  });
+  return changed ? out : exs;
+};
 // "Superset with Barbell Row · dropset 80%" — the pairing notes shown under an exercise.
-const exerciseNotes = (e) => {
+// `partners` (from supersetPartners) covers a pairing saved on the other member.
+const exerciseNotes = (e, partners) => {
   const parts = [];
-  if (e.supersetWith) parts.push('Superset with ' + e.supersetWith);
+  const ss = partners && partners.length ? partners : (e.supersetWith ? [e.supersetWith] : []);
+  if (ss.length) parts.push('Superset with ' + ss.join(' & '));
   if (e.dropset && e.dropset.pct) parts.push('Dropset at ' + e.dropset.pct + '%');
   return parts.join(' · ');
 };
@@ -536,6 +597,7 @@ export {
   PACES,
   migrateCardioDb, fmt, fmtDate, fmtDateShort, migrateArchive, exVol, W_DEFAULTS, scheme,
   weekStartISO, daySpan, KCAL_PER_KG, localISO, fixUtcDates, topWeight, loggedLine, exerciseNotes,
+  supersetPartners, groupSupersets, pruneSupersets, repairSupersets,
   isTimed, isBodyweight, fmtSecs, parseSecs, hasRange, repTarget, loadLabel, setVol, exHoldSecs,
   cardioRpe, rpeIntensity, cardioLine,
   seedSessions, seedExerciseDb, migrateExerciseDb, eqToOptions, eqLabel, KEY, BODY_PARTS,

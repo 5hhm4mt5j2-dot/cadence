@@ -232,12 +232,14 @@ export default function WorkoutMode({ v }) {
             <div style={s('font-size:12px; font-weight:600; color:var(--muted); margin-top:3px;')}>{wo.overviewSub}</div>
             <div style={s('display:flex; flex-direction:column; gap:10px; margin-top:14px;')}>
               {wo.overviewRows.map((r, i) => (
-                <div key={i} style={s(`background:${r.rowBg}; border-radius:14px; padding:12px 14px;`)}>
+                <div key={i} style={s(`background:${r.rowBg}; border-radius:14px; padding:12px 14px; box-shadow:${r.ssEdge};`)}>
                   <div style={s('display:flex; align-items:center; gap:7px;')}>
                     <span style={s(`font-size:13.5px; font-weight:800; color:${r.nameColor}; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;`)}>{r.name}</span>
+                    {r.superset && <span style={s('flex:none; font-size:9.5px; font-weight:800; color:var(--accent); background:var(--accent-soft); padding:3px 7px; border-radius:999px; text-transform:uppercase; letter-spacing:.05em;')}>Superset</span>}
                     {r.current && <span style={s('flex:none; font-size:9.5px; font-weight:800; color:#fff; background:var(--accent); padding:3px 7px; border-radius:999px; text-transform:uppercase; letter-spacing:.05em;')}>Now</span>}
                   </div>
                   <div style={s('font-size:11px; font-weight:600; color:var(--muted); margin-top:3px;')}>{r.meta}</div>
+                  {r.superset && <div style={s('font-size:11px; font-weight:700; color:var(--accent); margin-top:3px;')}>{r.ssLine}</div>}
                   {r.sets.length > 0 && (
                     <div style={s('display:flex; flex-wrap:wrap; gap:6px; margin-top:8px;')}>
                       {r.sets.map((st, j) => (

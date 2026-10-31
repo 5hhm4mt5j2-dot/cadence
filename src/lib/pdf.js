@@ -40,6 +40,8 @@ function render(JsPDF, r) {
     if (rightText) { font(o.size || 10, o.rightBold, o.rightGray); doc.text(clean(rightText), right, y + (o.size || 10), { align: 'right' }); }
     y += lines.length * lh + (o.after || 3);
   };
+  // Superset members arrive already grouped together; each carries who it was paired with.
+  const supersetNote = (ex) => { if (ex.ss) row('      ' + ex.ss, '', { size: 8.5, gray: 120 }); };
   const heading = (t) => { ensure(40); y += 12; rule(1.2); y += 8; row(t, '', { size: 13, bold: true, after: 4 }); };
 
   row(r.name, '', { size: 20, bold: true, after: 2 });
@@ -52,7 +54,7 @@ function render(JsPDF, r) {
     heading('Program');
     r.planDays.forEach(d => {
       y += 2; row(d.title, '', { bold: true, after: 2 });
-      d.exercises.forEach(ex => row('   ' + ex.name, ex.scheme, { size: 9.5, gray: 51, rightGray: 102 }));
+      d.exercises.forEach(ex => { row('   ' + ex.name, ex.scheme, { size: 9.5, gray: 51, rightGray: 102, after: ex.ss ? 0 : 3 }); supersetNote(ex); });
     });
   }
 
@@ -74,7 +76,7 @@ function render(JsPDF, r) {
     y += 6; rule(.6); y += 6;
     row(d.title, d.volume, { size: 11, bold: true, rightBold: true, after: 1 });
     row(d.dateLabel + (d.rpe ? ' · ' + d.rpe : ''), '', { size: 9, gray: 120, after: 4 });
-    d.exercises.forEach(ex => row('   ' + ex.name + ':  ' + ex.detail, ex.volume, { size: 9.5, gray: 51, rightGray: 140 }));
+    d.exercises.forEach(ex => { row('   ' + ex.name + ':  ' + ex.detail, ex.volume, { size: 9.5, gray: 51, rightGray: 140, after: ex.ss ? 0 : 3 }); supersetNote(ex); });
     if (d.notes) row('   “' + d.notes + '”', '', { size: 9, gray: 100 });
   });
 

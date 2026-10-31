@@ -11,6 +11,7 @@ import {
   PACES,
   migrateCardioDb, fmt, fmtDate, fmtDateShort, migrateArchive, exVol, W_DEFAULTS, scheme,
   weekStartISO, daySpan, KCAL_PER_KG, localISO, fixUtcDates, topWeight, loggedLine, exerciseNotes,
+  supersetPartners, groupSupersets, repairSupersets,
   seedSessions, seedExerciseDb, migrateExerciseDb, eqToOptions, eqLabel, KEY, BODY_PARTS,
   PLATE, MACRO_COLORS, ACTIVITY, ACTIVITY_MULT, GOALS, GOAL_RULES, DEFAULT_RECOVERY,
   RPE_SCALE, fmtKcal, mealMacroLine, GPU, itemMacros, sumItems, timeLabel,
@@ -267,7 +268,7 @@ export default class App extends React.Component {
     this._themeTimer = setInterval(() => this.applyAutoTheme(), 60 * 1000);
     this._autoTimer = setInterval(() => { this.applyAutoTheme(); this.refreshToday(); this.checkSupplementsReset(); this.normalizeCompletions(); this.maybeRefreshWeather(); }, 5 * 60 * 1000);
     this._armMidnight();
-    try { const raw = localStorage.getItem(KEY); if (raw) { const d = fixUtcDates(JSON.parse(raw)); const wk = this.reconcileWeekOverrides(d); this.setState({ recurring: d.recurring || this.state.recurring, week: wk.week || d.week || this.state.week, sessions: wk.sessions || d.sessions || this.state.sessions, weekOverrides: wk.weekOverrides, program: d.program || this.state.program, sessionHistory: d.sessionHistory || this.state.sessionHistory, programStartDate: d.programStartDate || this.state.programStartDate, programName: d.programName || this.state.programName, weights: Array.isArray(d.weights) ? d.weights : [], archive: migrateArchive(d.archive || this.state.archive), supplements: d.supplements || this.state.supplements, supplementsChecked: d.supplementsChecked || this.state.supplementsChecked, supplementsDate: d.supplementsDate || this.state.supplementsDate, exerciseDb: migrateExerciseDb(d.exerciseDb), profile: d.profile || null, meals: d.meals || [], customMeals: d.customMeals || [], tutorialDone: !!d.tutorialDone, recoveryProfile: d.recoveryProfile || { ...DEFAULT_RECOVERY }, recoveryLog: d.recoveryLog || [], cardioDb: migrateCardioDb(d.cardioDb), customLabels: d.customLabels || {}, restMode: !!d.restMode, flowPhase: (d.profile ? (d.tutorialDone ? 'done' : 'tutorial') : 'onboarding'), tutStep: (d.profile && !d.tutorialDone) ? Math.min(TUT_STEPS.length - 1, Math.max(0, parseInt(localStorage.getItem('lt_tut_step') || '0', 10) || 0)) : 0 }, () => { this.checkSupplementsReset(); this.normalizeCompletions(); this.maybeRecalibrate(); this._tutMeasureSoon(1100); }); } else { this.setState({ flowPhase: 'splash' }); this.checkSupplementsReset(); } } catch (e) {}
+    try { const raw = localStorage.getItem(KEY); if (raw) { const d = repairSupersets(fixUtcDates(JSON.parse(raw))); const wk = this.reconcileWeekOverrides(d); this.setState({ recurring: d.recurring || this.state.recurring, week: wk.week || d.week || this.state.week, sessions: wk.sessions || d.sessions || this.state.sessions, weekOverrides: wk.weekOverrides, program: d.program || this.state.program, sessionHistory: d.sessionHistory || this.state.sessionHistory, programStartDate: d.programStartDate || this.state.programStartDate, programName: d.programName || this.state.programName, weights: Array.isArray(d.weights) ? d.weights : [], archive: migrateArchive(d.archive || this.state.archive), supplements: d.supplements || this.state.supplements, supplementsChecked: d.supplementsChecked || this.state.supplementsChecked, supplementsDate: d.supplementsDate || this.state.supplementsDate, exerciseDb: migrateExerciseDb(d.exerciseDb), profile: d.profile || null, meals: d.meals || [], customMeals: d.customMeals || [], tutorialDone: !!d.tutorialDone, recoveryProfile: d.recoveryProfile || { ...DEFAULT_RECOVERY }, recoveryLog: d.recoveryLog || [], cardioDb: migrateCardioDb(d.cardioDb), customLabels: d.customLabels || {}, restMode: !!d.restMode, flowPhase: (d.profile ? (d.tutorialDone ? 'done' : 'tutorial') : 'onboarding'), tutStep: (d.profile && !d.tutorialDone) ? Math.min(TUT_STEPS.length - 1, Math.max(0, parseInt(localStorage.getItem('lt_tut_step') || '0', 10) || 0)) : 0 }, () => { this.checkSupplementsReset(); this.normalizeCompletions(); this.maybeRecalibrate(); this._tutMeasureSoon(1100); }); } else { this.setState({ flowPhase: 'splash' }); this.checkSupplementsReset(); } } catch (e) {}
     this._loadTimer = setTimeout(() => this.setState({ loading: false }), 800);
     this.initWeather();
     this._ptrDetach = window.LT && window.LT.attach({ onRefresh: () => new Promise((r) => setTimeout(r, 600)) });
@@ -356,10 +357,12 @@ export default class App extends React.Component {
   }
 
   // Undoing a logged set while the set logger is open moves the workout's cursor, so put
-  // it back on whatever the session now says is the next unlogged set.
+  // it back on whatever the session now says is the next unlogged set. It runs once the
+  // undo's own update has committed — a bare timeout could read the pre-undo session
+  // when React flushes the update later, landing on the wrong member of a superset.
   _resyncWorkout() {
     if (!this.state.workout) return;
-    setTimeout(() => {
+    this.setState({}, () => {
       const w = this.state.workout; if (!w) return;
       const slot = w.slot || 'a';
       const sess = this.slotSession(w.day, slot);
@@ -370,7 +373,7 @@ export default class App extends React.Component {
       const pf = this._prefill(exs[pos.exIdx]);
       this.setState({ workout: { day: w.day, slot, exIdx: pos.exIdx, setIdx: pos.setIdx, phase: 'set', reps: pf.reps, weight: pf.weight, secs: pf.secs, editSet: null }, workoutIdle: false });
       this._woIdleReset();
-    }, 0);
+    });
   }
 
   // ---- Toasts ----
@@ -478,7 +481,7 @@ export default class App extends React.Component {
     try {
       const raw = localStorage.getItem(KEY);
       if (raw) {
-        const d = fixUtcDates(JSON.parse(raw));
+        const d = repairSupersets(fixUtcDates(JSON.parse(raw)));
         const rwk = this.reconcileWeekOverrides(d);
         this.setState({
           recurring: d.recurring || this.state.recurring, week: rwk.week || d.week || this.state.week, sessions: rwk.sessions || d.sessions || {}, weekOverrides: rwk.weekOverrides,
@@ -1080,12 +1083,16 @@ export default class App extends React.Component {
 
   // The exercise sheet's working copy of an exercise. `timed` / `bw` stay null unless the
   // exercise carries an explicit flag, so they keep following the name until toggled.
+  // A pairing saved only on the partner's side still shows (and can be turned off) here.
   _exFormFrom(e, base) {
+    const day = base.index == null ? [] : this._dayExercises(base);
+    const back = (!e.supersetWith && !e.cardio) ? day.find((x, j) => j !== base.index && x && !x.cardio && x.supersetWith === e.name) : null;
+    const partner = e.supersetWith || (back ? back.name : '');
     return {
       ...base,
       name: e.name, cardio: !!e.cardio, sets: e.sets, reps: e.reps, weight: e.weight,
       duration: e.duration, intensity: e.intensity, distance: e.distance != null ? e.distance : '', rpe: e.cardio ? cardioRpe(e) : null,
-      supersetWith: e.supersetWith || '', dropset: e.dropset || null,
+      supersetWith: partner, origPartner: partner, dropset: e.dropset || null,
       repRange: hasRange(e), repsMin: hasRange(e) ? e.repsMin : (e.reps || ''), repsMax: hasRange(e) ? e.repsMax : '',
       timed: e.timed != null ? !!e.timed : null, bw: e.bw != null ? !!e.bw : null,
       holdSecs: e.holdSecs != null ? e.holdSecs : 30,
@@ -1128,14 +1135,20 @@ export default class App extends React.Component {
     const out = (list || []).map(x => ({ ...x }));
     let at;
     if (index === null || index === undefined || index >= out.length) { out.push({ ...item }); at = out.length - 1; }
-    else { const old = out[index]; out[index] = { ...item, ...(old.logged ? { logged: old.logged } : {}) }; at = index; }
+    else {
+      const old = out[index]; out[index] = { ...item, ...(old.logged ? { logged: old.logged } : {}) }; at = index;
+      // A rename carries the pairing with it: anything linked to the old name follows.
+      if (old.name && old.name !== item.name) out.forEach((x, j) => { if (j !== at && x.supersetWith === old.name) x.supersetWith = item.name; });
+    }
     if (prevPartner && prevPartner !== item.supersetWith) {
       out.forEach((x, j) => { if (j !== at && x.name === prevPartner && x.supersetWith === item.name) delete x.supersetWith; });
     }
     if (item.supersetWith) {
       const pj = out.findIndex((x, j) => j !== at && !x.cardio && x.name === item.supersetWith);
       if (pj >= 0) {
-        if (!out[pj].supersetWith) out[pj].supersetWith = item.name;
+        // Link back unless the partner already points at someone still on the day.
+        const pw = out[pj].supersetWith;
+        if (!pw || !out.some((x, j) => j !== pj && !x.cardio && x.name === pw)) out[pj].supersetWith = item.name;
       } else {
         const lu = this.lastUsedFor(item.supersetWith);
         const partner = { name: item.supersetWith, sets: item.sets || 3, reps: item.reps || 10, weight: lu ? (lu.weight || 0) : 0, supersetWith: item.name };
@@ -1168,11 +1181,14 @@ export default class App extends React.Component {
   }
 
   // #56 — the other exercises on the same day, which a superset can be paired with.
-  _supersetChoices(f) {
-    if (!f || f.cardio) return [];
-    const list = f.mode === 'program'
+  _dayExercises(f) {
+    return f.mode === 'program'
       ? ((this.state.program[f.day] || {}).exercises || [])
       : ((this.slotSession(f.day, f.slot || 'a') || {}).exercises || []);
+  }
+  _supersetChoices(f) {
+    if (!f || f.cardio) return [];
+    const list = this._dayExercises(f);
     return list.filter((e, i) => !e.cardio && i !== f.index && e.name && e.name !== f.name).map(e => e.name);
   }
 
@@ -1451,6 +1467,16 @@ export default class App extends React.Component {
       });
     }
     return Array.from(seen).sort((a, b) => a - b);
+  }
+
+  // Read-only exercise rows (history, archive, report) with each superset's members
+  // listed together and labelled. `row(e)` builds the row's own fields.
+  _groupedRows(exs, row) {
+    return groupSupersets(exs).map((g, k, arr) => ({
+      ...row(g.e),
+      ss: g.partners.length ? 'Superset with ' + g.partners.join(' & ') : '',
+      divider: k === arr.length - 1 ? 'transparent' : 'var(--border)',
+    }));
   }
 
   // Where the workout goes once a set (and its dropset) is in the book. A superset is
@@ -2178,7 +2204,7 @@ export default class App extends React.Component {
     const weeks = {}, firstSeen = {}, lastSeen = {}, loggedDates = {};
     const days = sessions.map(se => {
       let vol = 0;
-      const exercises = (se.exercises || []).map(e => {
+      const exercises = this._groupedRows(se.exercises, e => {
         const v = this.exVol(e); vol += v;
         const tw = topWeight(e);
         if (!e.cardio && !isTimed(e) && tw > 0) {
@@ -2237,7 +2263,7 @@ export default class App extends React.Component {
         .concat(holdSecs ? [{ label: 'Time in holds', value: fmtSecs(holdSecs) }] : []),
       planDays: (meta.days || []).filter(d => (d.exercises || []).length && d.type !== 'Rest' && (!meta.onlyDone || sessions.some(se => se.day === d.day))).map(d => ({
         title: FULL[d.day] + ' · ' + dayTypeName(d.type, d.day, cl, false, d.label),
-        exercises: (d.exercises || []).map(e => ({ name: e.name, scheme: scheme(e) })),
+        exercises: this._groupedRows(d.exercises, e => ({ name: e.name, scheme: scheme(e) })),
       })),
     };
   }
@@ -2688,7 +2714,7 @@ export default class App extends React.Component {
         hasExercises: exs.length > 0,
         empty: exs.length === 0,
         handleDisplay: exs.length > 1 ? 'flex' : 'none',
-        exercises: exs.map((e, idx) => {
+        exercises: exs.map((e, idx, all) => {
           const dr = s.sessDrag;
           const dragging = dr && dr.fromIndex === idx;
           let ty = '0px', z = 'auto', scale = '1', cardShadow = 'var(--shadow)', tyTransition = 'transform .2s cubic-bezier(.34,1.4,.64,1), box-shadow .2s ease';
@@ -2702,7 +2728,7 @@ export default class App extends React.Component {
             }
           }
           const startFrom = (clientY, ev) => { const rect = ev.currentTarget.closest('[data-sess-card]').getBoundingClientRect(); this._startSessDrag(clientY, idx, rect.height + 10); };
-          const exNotes = exerciseNotes(e);
+          const exNotes = exerciseNotes(e, supersetPartners(all)[idx]);
           return {
             name: e.name, scheme: scheme(e) + (!e.cardio && (e.logged || []).length ? ' · ' + Math.min((e.logged || []).length, e.sets || 0) + '/' + (e.sets || 0) + ' logged' : ''), volume: e.cardio ? ((e.duration || 0) + 'm') : (isTimed(e) ? fmtSecs(exHoldSecs(e)) : fmt(this.exVol(e))), volLabel: e.cardio ? 'cardio' : (isTimed(e) ? 'held' : 'volume'),
             notes: exNotes, hasNotes: !!exNotes,
@@ -2790,7 +2816,7 @@ export default class App extends React.Component {
         empty: p.exercises.length === 0,
         reorderMode: s.reorderMode === apd,
         notReorderMode: s.reorderMode !== apd,
-        exercises: p.exercises.map((e, idx) => {
+        exercises: p.exercises.map((e, idx, all) => {
           const inReorder = s.reorderMode === apd;
           const sw = s.swipe;
           const swActive = sw && sw.day === apd && sw.index === idx;
@@ -2809,7 +2835,7 @@ export default class App extends React.Component {
             const rect = ev.currentTarget.getBoundingClientRect();
             this._startDrag(clientY, idx, rect.height + 10);
           };
-          const pdNotes = exerciseNotes(e);
+          const pdNotes = exerciseNotes(e, supersetPartners(all)[idx]);
           return {
             name: e.name, scheme: scheme(e), notes: pdNotes, hasNotes: !!pdNotes, dx: dx + 'px',
             ty, z, jiggle: jig, cardShadow, tyTransition, deleteBg: inReorder ? 'transparent' : '#EF4444',
@@ -2855,7 +2881,7 @@ export default class App extends React.Component {
               this.setState({ exForm: this._exFormFrom(e, { mode: 'program', day: apd, index: idx }) });
             },
             deleteNow: () => {
-              const list = (p.exercises || []).filter((_, i) => i !== idx);
+              const list = (p.exercises || []).filter((_, i) => i !== idx).map(x => this._unpair(x, e));
               this.setState({ swipe: null });
               this.updateProgramDay(apd, { exercises: list });
             },
@@ -2920,7 +2946,7 @@ export default class App extends React.Component {
         range: (arcEntry.startDate && arcEntry.endDate) ? (fmtDate(arcEntry.startDate) + ' → ' + fmtDate(arcEntry.endDate)) : (arcEntry.label || ''),
         dayGroups: (arcEntry.days || []).filter(d => (d.exercises || []).length && d.type !== 'Rest' && doneDays[d.day]).map(d => ({
           title: FULL[d.day] + ' · ' + dayTypeName(d.type, d.day, cl, false, d.label),
-          exercises: (d.exercises || []).map((e, i) => ({ name: e.name, scheme: scheme(e), divider: i === d.exercises.length - 1 ? 'transparent' : 'var(--border)' })),
+          exercises: this._groupedRows(d.exercises, e => ({ name: e.name, scheme: scheme(e) })),
         })),
         hasSessions: arcDone.length > 0, noSessions: arcDone.length === 0,
         label: arcEntry.label, volume: fmt(tv), count: arcDone.length,
@@ -2936,11 +2962,10 @@ export default class App extends React.Component {
             volume: cardioOnly ? se.exercises.reduce((a, e) => a + (+e.duration || 0), 0) + ' min' : fmt(v), hasDate: !!se.date,
             dateLabel: (se.date ? fmtDate(se.date) : '') + (se.rpe != null ? ' · RPE ' + se.rpe + '/10' : '') + (sets ? ' · ' + sets + ' sets logged' : ''),
             hasNotes: !!se.notes, notes: se.notes || '',
-            exercises: se.exercises.map((e, i) => ({
+            exercises: this._groupedRows(se.exercises, e => ({
               name: e.name,
               scheme: loggedLine(e),
               planned: (e.cardio || !(e.logged || []).length) ? '' : ('plan ' + scheme(e)),
-              divider: i === se.exercises.length - 1 ? 'transparent' : 'var(--border)',
             })),
           };
         }),
@@ -3059,7 +3084,7 @@ export default class App extends React.Component {
       dateLabel: fmtDate(h.date) + (h.rpe != null ? ' · RPE ' + h.rpe + '/10' : ''),
       volume: fmt(this.recordVolume(h)),
       // The sets as logged — a session that ran long or short reads as it happened.
-      exercises: h.exercises.map((e, i) => ({ name: e.name, scheme: loggedLine(e), divider: i === h.exercises.length - 1 ? 'transparent' : 'var(--border)' })),
+      exercises: this._groupedRows(h.exercises, e => ({ name: e.name, scheme: loggedLine(e) })),
     })));
 
     // exercise database
@@ -3432,6 +3457,7 @@ export default class App extends React.Component {
       const wGroup = (we && phase !== 'summary') ? this._supersetGroup(wexs, wk.exIdx) : [];
       const wNextInRound = wGroup.length > 1 ? wGroup.slice(wGroup.indexOf(wk.exIdx) + 1).find(j => (wexs[j].logged || []).length < (wexs[j].sets || 0)) : undefined;
       const esEx = es ? wexs[es.exIdx != null ? es.exIdx : wk.exIdx] : null;
+      let wPartners = null;
       wo = {
         dayLabel: (FULL[wk.day] || '') + ((wk.slot === 'b') ? ' · ' + ((wsess.label) || 'Second workout') : ''),
         // #62 — what this exercise was last lifted at, when nothing is logged yet today.
@@ -3453,8 +3479,12 @@ export default class App extends React.Component {
         overviewRows: wexs.map((e, i) => {
           const lg = e.logged || [];
           const done = lg.filter(l => !l.skipped).length;
+          const ssWith = (wPartners || (wPartners = supersetPartners(wexs)))[i];
           return {
             name: e.name,
+            superset: ssWith.length > 0,
+            ssLine: ssWith.length ? 'Superset with ' + ssWith.join(' & ') + ' · rest after the round' : '',
+            ssEdge: ssWith.length ? 'inset 3px 0 0 var(--accent)' : 'none',
             current: i === wk.exIdx && phase !== 'summary',
             nameColor: (i === wk.exIdx && phase !== 'summary') ? 'var(--accent)' : 'var(--text)',
             rowBg: (i === wk.exIdx && phase !== 'summary') ? 'var(--accent-soft)' : 'var(--surface-2)',
@@ -3509,7 +3539,7 @@ export default class App extends React.Component {
         holdEnd: () => this._woHoldEnd(),
         valTS: (e) => { const t = e.touches && e.touches[0]; if (t) this._wvY = t.clientY; },
         repsSwipe: (e) => this._woSwipe(e, 'reps'), weightSwipe: (e) => this._woSwipe(e, 'weight'),
-        logLabel: we && wk.setIdx >= (we.sets || 0) - 1 ? 'Finish exercise' : 'Log set',
+        logLabel: wNextInRound != null ? 'Log set → ' + wexs[wNextInRound].name : (we && wk.setIdx >= (we.sets || 0) - 1 ? 'Finish exercise' : 'Log set'),
         logSet: () => this._woLog(false), skipSet: () => this._woLog(true),
         restTitle: gLast ? gLast.name : (we ? we.name : ''),
         time: mmss(wk.restLeft || 0), circ: String(circ), dash: String(circ * (1 - frac)),
@@ -4537,22 +4567,19 @@ export default class App extends React.Component {
         if (!f.cardio && f.repRange && !(+f.repsMax > +f.repsMin && +f.repsMin > 0)) { this.showToast('Set a rep range with a max higher than the min.'); return; }
         const item = this._exItemFromForm(f);
         this.haptic(false);
-        const listIn = (exs) => (exs || [])[f.index] || null;
         if (f.mode === 'program') {
           const day = f.day; const p = s.program[day];
-          const prev = f.index === null ? null : listIn(p.exercises);
-          this.updateProgramDay(day, { exercises: this._applyExerciseEdit(p.exercises, f.index, item, prev && prev.supersetWith) });
+          this.updateProgramDay(day, { exercises: this._applyExerciseEdit(p.exercises, f.index, item, f.origPartner) });
         } else {
           const day = f.day; const slot = f.slot || 'a';
           const sess = this.slotSession(day, slot); if (!sess) { this.setState({ exForm: null }); return; }
-          const prev = f.index === null ? null : listIn(sess.exercises);
-          const list = this._applyExerciseEdit(sess.exercises, f.index, item, prev && prev.supersetWith);
+          const list = this._applyExerciseEdit(sess.exercises, f.index, item, f.origPartner);
           // The recurring template mirrors the day's main workout only — a second
           // workout is a one-off for that day and never rewrites the program.
           let extra = null;
           if (slot === 'a') {
             const prog = s.program[day];
-            extra = prog ? { program: { ...s.program, [day]: { ...prog, exercises: this._applyExerciseEdit(prog.exercises, (f.index === null || f.index >= (prog.exercises || []).length) ? null : f.index, item, prev && prev.supersetWith).map(x => { const c = { ...x }; delete c.logged; return c; }) } } } : null;
+            extra = prog ? { program: { ...s.program, [day]: { ...prog, exercises: this._applyExerciseEdit(prog.exercises, (f.index === null || f.index >= (prog.exercises || []).length) ? null : f.index, item, f.origPartner).map(x => { const c = { ...x }; delete c.logged; return c; }) } } } : null;
           }
           this.saveSessionExercises(day, slot, list, extra);
         }

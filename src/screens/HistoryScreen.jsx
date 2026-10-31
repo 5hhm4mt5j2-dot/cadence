@@ -21,7 +21,10 @@ export default function HistoryScreen({ v }) {
             <div style={s('margin-top:10px; display:flex; flex-direction:column;')}>
               {h.exercises.map((ex, j) => (
                 <div key={j} style={s(`display:flex; align-items:center; justify-content:space-between; padding:7px 0; border-bottom:1px solid ${ex.divider};`)}>
-                  <span style={s('font-size:12.5px; font-weight:600; color:var(--text); flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;')}>{ex.name}</span>
+                  <span style={s('flex:1; min-width:0;')}>
+                    <span style={s('display:block; font-size:12.5px; font-weight:600; color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;')}>{ex.name}</span>
+                    {!!ex.ss && <span style={s('display:block; font-size:10.5px; font-weight:700; color:var(--accent); margin-top:1px;')}>{ex.ss}</span>}
+                  </span>
                   <span style={s("font-family:'JetBrains Mono',monospace; font-size:11.5px; color:var(--muted); font-weight:600;")}>{ex.scheme}</span>
                 </div>
               ))}
