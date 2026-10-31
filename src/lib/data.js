@@ -438,6 +438,7 @@ function seedExerciseDb() {
       mk('Pendlay Row', 'Explosive barbell row from a dead stop each rep.', 'Barbell'),
       mk('T-Bar Row', 'Landmine row for mid-back thickness.', ['V-handle', 'Wide grip', 'Close grip']),
       mk('Seated Cable Row', 'Seated horizontal cable pull to the torso.', ['V-bar', 'Wide bar', 'Rope']),
+      mk('Dumbbell Row', 'Two-arm bent-over row with a dumbbell in each hand, pulled to the hips.', 'Dumbbells'),
       mk('Single-Arm Dumbbell Row', 'One-arm dumbbell row braced on a bench.', 'Dumbbell, flat bench'),
       mk('Chest-Supported Row', 'Row face-down on an incline bench to remove lower-back strain.', 'Dumbbells or machine, incline bench'),
       mk('Straight-Arm Pulldown', 'Cable pullover-style movement isolating the lats.', ['Straight bar', 'Rope']),
