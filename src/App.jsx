@@ -2245,7 +2245,9 @@ export default class App extends React.Component {
         return { name: n, line: a + ' kg → ' + b + ' kg', delta: (pct > 0 ? '+' : '') + pct + '%', pct, color: b > a ? '#4C7A5E' : '#A05B3C' };
       })
       .sort((x, y) => y.pct - x.pct);
-    const weeksN = span / 7;
+    // A program shorter than a week counts as one week — dividing by a fraction of a week
+    // inflated "per week" past the total (2,240 kg over one day read as 15,680 kg/week).
+    const weeksN = Math.max(1, span / 7);
     return {
       name: meta.name || 'Program', status: meta.status || '',
       range: (startDate && endDate) ? (fmtDate(startDate) + ' → ' + fmtDate(endDate)) : 'No sessions logged yet',
