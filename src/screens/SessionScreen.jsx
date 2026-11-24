@@ -16,8 +16,13 @@ export default function SessionScreen({ v }) {
           <span style={s('display:inline-flex; width:56px; height:56px; border-radius:50%; background:var(--accent-soft); align-items:center; justify-content:center; margin-bottom:20px;')}><svg width="25" height="25" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg></span>
           <div style={s('font-size:20px; font-weight:800; color:var(--text); letter-spacing:-.02em; line-height:1.35;')}>{sx.doneTitle}</div>
           <div style={s('font-size:14.5px; font-weight:600; color:var(--muted); margin-top:7px; line-height:1.5;')}>Eat Well &amp; Get Some Rest.</div>
-          <button onClick={v.editCompletedWorkout} style={s('margin-top:26px; border:1px solid var(--border); background:var(--surface); cursor:pointer; font-family:inherit; font-size:13px; font-weight:700; color:var(--text); padding:11px 22px; border-radius:12px;')}>Edit workout</button>
-          <div><button onClick={v.peekSession} style={s('margin-top:12px; border:none; background:transparent; cursor:pointer; font-family:inherit; font-size:12px; font-weight:700; color:var(--faint);')}>View session details</button></div>
+          <div style={s('display:flex; justify-content:center; gap:10px; margin-top:26px;')}>
+            <button onClick={v.viewCompleted} aria-label="View completed workout" style={s('border:1px solid var(--border); background:var(--surface); cursor:pointer; font-family:inherit; font-size:13px; font-weight:700; color:var(--text); padding:11px 18px; border-radius:12px; display:inline-flex; align-items:center; gap:8px;')}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+              View
+            </button>
+            <button onClick={v.editCompletedWorkout} style={s('border:1px solid var(--border); background:var(--surface); cursor:pointer; font-family:inherit; font-size:13px; font-weight:700; color:var(--text); padding:11px 22px; border-radius:12px;')}>Edit workout</button>
+          </div>
         </div>
       )}
       {v.sessionNormal && (
@@ -126,6 +131,41 @@ export default function SessionScreen({ v }) {
           )}
         </div>
       )}
+    </>
+  );
+}
+
+// Read-only completed workout, drawn exactly like a Session History card.
+export function CompletedView({ v }) {
+  const h = v.cv;
+  return (
+    <>
+      <div data-lt-backdrop onClick={h.close} style={s('position:absolute; inset:0; background:rgba(0,0,0,.42); z-index:42;')}></div>
+      <div data-lt-sheet className="scrollable" style={s('position:absolute; left:0; right:0; bottom:0; z-index:43; background:var(--bg); border-radius:26px 26px 0 0; box-shadow:0 -10px 40px rgba(0,0,0,.26); padding:12px 16px 24px; max-height:88%; overflow-y:auto;')}>
+        <div style={s('width:40px; height:4px; border-radius:999px; background:var(--border); margin:0 auto 14px;')}></div>
+        <div style={s('background:var(--surface); border:1px solid var(--border); border-radius:18px; padding:16px; box-shadow:var(--shadow);')}>
+          <div style={s('display:flex; align-items:center; justify-content:space-between;')}>
+            <span style={s('font-size:14px; font-weight:800; color:var(--text);')}>{h.title}</span>
+            <span style={s("font-family:'JetBrains Mono',monospace; font-size:13px; font-weight:700; color:var(--accent);")}>{h.volume}</span>
+          </div>
+          <div style={s('font-size:11.5px; color:var(--muted); font-weight:600; margin-top:2px;')}>{h.dateLabel}</div>
+          <div style={s('margin-top:10px; display:flex; flex-direction:column;')}>
+            {h.exercises.map((ex, j) => (
+              <div key={j} style={s(`display:flex; align-items:center; justify-content:space-between; padding:7px 0; border-bottom:1px solid ${ex.divider};`)}>
+                <span style={s('flex:1; min-width:0;')}>
+                  <span style={s('display:block; font-size:12.5px; font-weight:600; color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;')}>{ex.name}</span>
+                  {!!ex.ss && <span style={s('display:block; font-size:10.5px; font-weight:700; color:var(--accent); margin-top:1px;')}>{ex.ss}</span>}
+                </span>
+                <span style={s("font-family:'JetBrains Mono',monospace; font-size:11.5px; color:var(--muted); font-weight:600;")}>{ex.scheme}</span>
+              </div>
+            ))}
+          </div>
+          {!!h.notes && (
+            <div style={s('margin-top:10px; font-size:12px; color:var(--muted); font-weight:500; line-height:1.5;')}>{h.notes}</div>
+          )}
+        </div>
+        <button onClick={h.close} style={s('width:100%; margin-top:14px; border:1px solid var(--border); background:var(--surface); cursor:pointer; font-family:inherit; font-size:13.5px; font-weight:700; color:var(--text); padding:13px 0; border-radius:13px;')}>Close</button>
+      </div>
     </>
   );
 }

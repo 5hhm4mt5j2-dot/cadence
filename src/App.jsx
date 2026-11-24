@@ -27,7 +27,7 @@ import Shell from './components/Shell';
 // step restores the keys one write replaced, so it has to list the same keys — anything
 // outside this set is transient UI and is left alone.
 const UNDO_KEYS = [
-  'recurring', 'week', 'sessions', 'weekOverrides', 'program', 'sessionHistory',
+  'recurring', 'week', 'weekOf', 'sessions', 'weekOverrides', 'program', 'sessionHistory',
   'programStartDate', 'programName', 'weights', 'archive', 'supplements',
   'supplementsChecked', 'supplementsDate', 'exerciseDb', 'cardioDb', 'profile',
   'meals', 'customMeals', 'recoveryProfile', 'recoveryLog', 'customLabels', 'restMode',
@@ -59,6 +59,8 @@ export default class App extends React.Component {
       swipe: null,
       weekOffset: 0,
       weekOverrides: {},
+      // Week-start (ISO) that `week` / `sessions` were built for — see rollWeek().
+      weekOf: localISO(new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate() - di)),
       todayKey: DAYS[di],
       program,
       recurring,
@@ -140,6 +142,7 @@ export default class App extends React.Component {
       weights: [],
       weightForm: null,
       sessionPeek: null,
+      completedView: null,
       archive: [
         { id: 'w1', label: 'From 16 Jun 2026 to 22 Jun 2026', sessions: [
           { day: 'Mon', type: 'Push', date: '2026-06-16', exercises: [ { name: 'Bench Press', sets: 4, reps: 8, weight: 62 }, { name: 'Overhead Press', sets: 3, reps: 10, weight: 42 }, { name: 'Incline DB Press', sets: 3, reps: 12, weight: 24 }, { name: 'Triceps Pushdown', sets: 4, reps: 15, weight: 27 } ] },
@@ -268,7 +271,7 @@ export default class App extends React.Component {
     this._themeTimer = setInterval(() => this.applyAutoTheme(), 60 * 1000);
     this._autoTimer = setInterval(() => { this.applyAutoTheme(); this.refreshToday(); this.checkSupplementsReset(); this.normalizeCompletions(); this.maybeRefreshWeather(); }, 5 * 60 * 1000);
     this._armMidnight();
-    try { const raw = localStorage.getItem(KEY); if (raw) { const d = repairSupersets(fixUtcDates(JSON.parse(raw))); const wk = this.reconcileWeekOverrides(d); this.setState({ recurring: d.recurring || this.state.recurring, week: wk.week || d.week || this.state.week, sessions: wk.sessions || d.sessions || this.state.sessions, weekOverrides: wk.weekOverrides, program: d.program || this.state.program, sessionHistory: d.sessionHistory || this.state.sessionHistory, programStartDate: d.programStartDate || this.state.programStartDate, programName: d.programName || this.state.programName, weights: Array.isArray(d.weights) ? d.weights : [], archive: migrateArchive(d.archive || this.state.archive), supplements: d.supplements || this.state.supplements, supplementsChecked: d.supplementsChecked || this.state.supplementsChecked, supplementsDate: d.supplementsDate || this.state.supplementsDate, exerciseDb: migrateExerciseDb(d.exerciseDb), profile: d.profile || null, meals: d.meals || [], customMeals: d.customMeals || [], tutorialDone: !!d.tutorialDone, recoveryProfile: d.recoveryProfile || { ...DEFAULT_RECOVERY }, recoveryLog: d.recoveryLog || [], cardioDb: migrateCardioDb(d.cardioDb), customLabels: d.customLabels || {}, restMode: !!d.restMode, flowPhase: (d.profile ? (d.tutorialDone ? 'done' : 'tutorial') : 'onboarding'), tutStep: (d.profile && !d.tutorialDone) ? Math.min(TUT_STEPS.length - 1, Math.max(0, parseInt(localStorage.getItem('lt_tut_step') || '0', 10) || 0)) : 0 }, () => { this.checkSupplementsReset(); this.normalizeCompletions(); this.maybeRecalibrate(); this._tutMeasureSoon(1100); }); } else { this.setState({ flowPhase: 'splash' }); this.checkSupplementsReset(); } } catch (e) {}
+    try { const raw = localStorage.getItem(KEY); if (raw) { const d = repairSupersets(fixUtcDates(JSON.parse(raw))); const wk = this.reconcileWeekOverrides(d); this.setState({ recurring: d.recurring || this.state.recurring, week: wk.week || d.week || this.state.week, sessions: wk.sessions || d.sessions || this.state.sessions, weekOverrides: wk.weekOverrides, weekOf: wk.weekOf, program: d.program || this.state.program, sessionHistory: d.sessionHistory || this.state.sessionHistory, programStartDate: d.programStartDate || this.state.programStartDate, programName: d.programName || this.state.programName, weights: Array.isArray(d.weights) ? d.weights : [], archive: migrateArchive(d.archive || this.state.archive), supplements: d.supplements || this.state.supplements, supplementsChecked: d.supplementsChecked || this.state.supplementsChecked, supplementsDate: d.supplementsDate || this.state.supplementsDate, exerciseDb: migrateExerciseDb(d.exerciseDb), profile: d.profile || null, meals: d.meals || [], customMeals: d.customMeals || [], tutorialDone: !!d.tutorialDone, recoveryProfile: d.recoveryProfile || { ...DEFAULT_RECOVERY }, recoveryLog: d.recoveryLog || [], cardioDb: migrateCardioDb(d.cardioDb), customLabels: d.customLabels || {}, restMode: !!d.restMode, flowPhase: (d.profile ? (d.tutorialDone ? 'done' : 'tutorial') : 'onboarding'), tutStep: (d.profile && !d.tutorialDone) ? Math.min(TUT_STEPS.length - 1, Math.max(0, parseInt(localStorage.getItem('lt_tut_step') || '0', 10) || 0)) : 0 }, () => { this.checkSupplementsReset(); this.normalizeCompletions(); this.maybeRecalibrate(); this._tutMeasureSoon(1100); }); } else { this.setState({ flowPhase: 'splash' }); this.checkSupplementsReset(); } } catch (e) {}
     this._loadTimer = setTimeout(() => this.setState({ loading: false }), 800);
     this.initWeather();
     this._ptrDetach = window.LT && window.LT.attach({ onRefresh: () => new Promise((r) => setTimeout(r, 600)) });
@@ -314,7 +317,7 @@ export default class App extends React.Component {
   save(patch, undoLabel) {
     if (undoLabel !== null && !this._undoing) this._pushUndo(patch, undoLabel);
     this.setState(patch, () => {
-      try { localStorage.setItem(KEY, JSON.stringify({ recurring: this.state.recurring, week: this.state.week, sessions: this.state.sessions, weekOverrides: this.state.weekOverrides, program: this.state.program, sessionHistory: this.state.sessionHistory, programStartDate: this.state.programStartDate, programName: this.state.programName, weights: this.state.weights, archive: this.state.archive, supplements: this.state.supplements, supplementsChecked: this.state.supplementsChecked, supplementsDate: this.state.supplementsDate, exerciseDb: this.state.exerciseDb, cardioDb: this.state.cardioDb, profile: this.state.profile, meals: this.state.meals, customMeals: this.state.customMeals, tutorialDone: this.state.tutorialDone, recoveryProfile: this.state.recoveryProfile, recoveryLog: this.state.recoveryLog, customLabels: this.state.customLabels, restMode: this.state.restMode })); this._saveFailed = false; } catch (e) { if (!this._saveFailed) { this._saveFailed = true; this.showToast("Couldn't save — device storage may be full or blocked (private browsing). Recent changes won't persist."); } }
+      try { localStorage.setItem(KEY, JSON.stringify({ recurring: this.state.recurring, week: this.state.week, weekOf: this.state.weekOf, sessions: this.state.sessions, weekOverrides: this.state.weekOverrides, program: this.state.program, sessionHistory: this.state.sessionHistory, programStartDate: this.state.programStartDate, programName: this.state.programName, weights: this.state.weights, archive: this.state.archive, supplements: this.state.supplements, supplementsChecked: this.state.supplementsChecked, supplementsDate: this.state.supplementsDate, exerciseDb: this.state.exerciseDb, cardioDb: this.state.cardioDb, profile: this.state.profile, meals: this.state.meals, customMeals: this.state.customMeals, tutorialDone: this.state.tutorialDone, recoveryProfile: this.state.recoveryProfile, recoveryLog: this.state.recoveryLog, customLabels: this.state.customLabels, restMode: this.state.restMode })); this._saveFailed = false; } catch (e) { if (!this._saveFailed) { this._saveFailed = true; this.showToast("Couldn't save — device storage may be full or blocked (private browsing). Recent changes won't persist."); } }
     });
   }
 
@@ -349,7 +352,7 @@ export default class App extends React.Component {
       ...entry.before,
       undoStack: stack.slice(0, -1),
       sessDrag: null, drag: null, swipe: null, bulkEdit: null, exForm: null,
-      confirmComplete: false, restartAsk: null, sessionPeek: null,
+      confirmComplete: false, restartAsk: null, sessionPeek: null, completedView: null,
     }, null);
     this._undoing = false;
     this._resyncWorkout();
@@ -484,7 +487,7 @@ export default class App extends React.Component {
         const d = repairSupersets(fixUtcDates(JSON.parse(raw)));
         const rwk = this.reconcileWeekOverrides(d);
         this.setState({
-          recurring: d.recurring || this.state.recurring, week: rwk.week || d.week || this.state.week, sessions: rwk.sessions || d.sessions || {}, weekOverrides: rwk.weekOverrides,
+          recurring: d.recurring || this.state.recurring, week: rwk.week || d.week || this.state.week, sessions: rwk.sessions || d.sessions || {}, weekOverrides: rwk.weekOverrides, weekOf: rwk.weekOf,
           program: d.program || this.state.program, sessionHistory: d.sessionHistory || [], programStartDate: d.programStartDate || this.state.programStartDate,
           programName: d.programName || this.state.programName, weights: Array.isArray(d.weights) ? d.weights : [],
           archive: migrateArchive(d.archive || this.state.archive), supplements: d.supplements || this.state.supplements,
@@ -536,6 +539,18 @@ export default class App extends React.Component {
     const name = ((rec.slot || 'a') === 'b' && rec.label) ? rec.label : dayTypeName(rec.type, rec.day, cl, false, rec.label);
     return FULL[rec.day] + ' · ' + name;
   }
+  // One Session History card. Also what a completed day's eye button shows, so the two
+  // always read the same.
+  historyEntry(h) {
+    return {
+      title: this.recordTitle(h),
+      dateLabel: fmtDate(h.date) + (h.rpe != null ? ' · RPE ' + h.rpe + '/10' : ''),
+      volume: fmt(this.recordVolume(h)),
+      // The sets as logged — a session that ran long or short reads as it happened.
+      exercises: this._groupedRows(h.exercises, e => ({ name: e.name, scheme: loggedLine(e) })),
+      notes: h.notes || '',
+    };
+  }
   historyId(day, slot, dateISO) { return day + '_' + dateISO + (slot === 'b' ? '_b' : ''); }
   // The record this week's logged session wrote, if there is one.
   historyRecordFor(day, slot) {
@@ -569,8 +584,8 @@ export default class App extends React.Component {
     }));
   }
 
-  // One place to write a session's exercise list: session, recurring template (main slot
-  // only, when it still mirrors the day) and the logged record all stay consistent.
+  // One place to write a session's exercise list: the session and its logged record stay
+  // consistent. Never touches the master template.
   saveSessionExercises(day, slot, exercises, extra) {
     const patch = { sessions: this.patchSlot(day, slot, { exercises }), ...(extra || {}) };
     const hist = this.syncHistoryExercises(day, slot, exercises);
@@ -595,20 +610,36 @@ export default class App extends React.Component {
     return { ...(prev || { completed: false, notes: '' }), exercises: next };
   }
 
-  // An "every week" edit writes the recurring template AND the week on screen, so the
-  // change is visible straight away (#60) — except on a day whose session was moved in
-  // or out this week, which would otherwise be overwritten by someone else's workout.
+  // Has this week's copy of `day` been changed on its own ("just this week" — moved,
+  // skipped onto, combined, converted, renamed, exercises added/removed/reordered) so it
+  // no longer mirrors the master template? Sets/reps/weights and logged work don't count:
+  // a session that only differs in what was lifted still follows the template.
+  dayOverridden(day) {
+    const s = this.state;
+    if ((s.week[day] || 'Rest') !== (s.recurring[day] || 'Rest')) return true;
+    const sess = s.sessions[day];
+    if (!sess) return false;
+    if (sess.label != null) return true;
+    const names = (xs) => (xs || []).map(e => e.name + '|' + (e.supersetWith || '')).join('\n');
+    return names(sess.exercises) !== names((s.program[day] || {}).exercises);
+  }
+
+  // Current Programme is the master plan and the only writer of program/recurring. An
+  // edit there reaches every week that hasn't overridden the day: future weeks resolve
+  // from the master on the fly (viewWeek), and the live week is updated here so the change
+  // shows straight away (#60) — except on a day this week has already changed on its own,
+  // which keeps its week-only version until the week rolls over.
   updateProgramDay(day, patch) {
     const p = { ...this.state.program[day], ...patch };
     const program = { ...this.state.program, [day]: p };
     const recurring = { ...this.state.recurring, [day]: p.type };
     const week = { ...this.state.week };
-    const wasMoved = this.state.week[day] !== this.state.recurring[day];
+    const wasMoved = this.dayOverridden(day);
     if (!wasMoved) week[day] = p.type;
     const sessions = { ...this.state.sessions };
     const prev = sessions[day];
     if (wasMoved) {
-      this.showToast(FULL[day] + ' is holding a moved session this week — the change starts next week.');
+      this.showToast(FULL[day] + ' has a change for this week only — your program edit applies from next week.');
     } else if (week[day] && week[day] !== 'Rest') {
       sessions[day] = this.mergeTemplateIntoSession(prev, p.exercises);
     } else if (prev && (prev.exercises || []).some(e => (e.logged || []).length)) {
@@ -674,21 +705,13 @@ export default class App extends React.Component {
     const sess = this.slotSession(ad, slot);
     if (!sess) return;
     const sessions = this.patchSlot(ad, slot, { exercises: move(sess.exercises || []) });
+    // This week only — the master order is changed in Current Programme.
     const patch = { sessions };
-    // carry the same order into the recurring template when it mirrors this session
-    const prog = this.state.program[ad];
-    const se = sess.exercises || [];
-    let syncedTemplate = false;
-    if (slot === 'a' && prog && prog.exercises && prog.exercises.length === se.length && prog.exercises.every((e, i) => e.name === se[i].name)) {
-      const program = { ...this.state.program, [ad]: { ...prog, exercises: move(prog.exercises) } };
-      patch.program = program;
-      syncedTemplate = true;
-    }
     const hist = this.syncHistoryExercises(ad, slot, move(sess.exercises || []));
     if (hist) patch.sessionHistory = hist;
     this.haptic(true);
     this.save(patch, 'the reorder');
-    this.showToast(syncedTemplate ? 'Order saved — applies every week.' : 'Order saved for this week.');
+    this.showToast('Order saved for this week.');
   }
 
   addExerciseToProgram(day, item) {
@@ -698,7 +721,7 @@ export default class App extends React.Component {
     const exercises = (p.exercises || []).concat([{ ...item }]);
     this.updateProgramDay(day, { type, exercises });
     // A Rest day just became a Custom training day — prompt for a real name.
-    if (wasRest && !((this.state.customLabels || {})[day])) this.setState({ tagRename: { day, value: '' } });
+    if (wasRest && !((this.state.customLabels || {})[day])) this.setState({ tagRename: { day, value: '', scope: 'program' } });
   }
 
   addCardioToProgram(day, item) {
@@ -780,6 +803,8 @@ export default class App extends React.Component {
   // completed only if a workout was logged for it THIS week. Runs on load + periodically
   // so a day that "passes" without a logged session no longer shows as done.
   normalizeCompletions() {
+    // A new week starts from the master template, which has nothing stale in it.
+    if (this.rollWeek()) return;
     const sessions = this.state.sessions || {};
     const curKey = this.weekKey(0);
     let changed = false;
@@ -803,7 +828,13 @@ export default class App extends React.Component {
   }
 
   // Migrate legacy relative-offset override keys ("1", "-2") to absolute week-start
-  // dates, then fold any override matured onto the current week into week/sessions.
+  // dates, then make week/sessions belong to the current week. They are keyed by weekday,
+  // so once the week they were built for (`weekOf`) is behind us they are rebuilt from the
+  // master template (program/recurring) — otherwise a "just this week" change made on a
+  // Monday would come back every Monday after it. The outgoing week's re-planned days are
+  // filed under that week's own key so looking back still shows them, and any override
+  // saved ahead of time for the new week is folded in. Data saved before `weekOf` existed
+  // is taken to be this week's.
   reconcileWeekOverrides(d) {
     const src = d.weekOverrides || {};
     const out = {};
@@ -812,11 +843,28 @@ export default class App extends React.Component {
       else out[k] = src[k];
     });
     const curKey = this.weekKey(0);
-    const patch = { weekOverrides: out };
+    const patch = { weekOverrides: out, weekOf: curKey };
+    let week = d.week || this.state.week;
+    let sessions = d.sessions || this.state.sessions;
+    const stale = !!d.weekOf && d.weekOf < curKey;
+    if (stale) {
+      const recurring = d.recurring || this.state.recurring;
+      const program = d.program || this.state.program;
+      const prev = out[d.weekOf] || {};
+      const past = { types: { ...(prev.types || {}) }, sessions: { ...(prev.sessions || {}) } };
+      let moved = false;
+      DAYS.forEach(day => {
+        if ((week[day] || 'Rest') === (recurring[day] || 'Rest') && !(sessions[day] && sessions[day].label != null)) return;
+        past.types[day] = week[day] || 'Rest'; past.sessions[day] = sessions[day] || null; moved = true;
+      });
+      if (moved) out[d.weekOf] = past;
+      week = { ...recurring };
+      sessions = seedSessions(week, program);
+    }
     const matured = out[curKey];
     if (matured) {
-      const week = { ...(d.week || this.state.week) };
-      const sessions = { ...(d.sessions || this.state.sessions) };
+      week = { ...week };
+      sessions = { ...sessions };
       DAYS.forEach(day => {
         if (matured.types && day in matured.types) {
           week[day] = matured.types[day];
@@ -825,9 +873,18 @@ export default class App extends React.Component {
         }
       });
       delete out[curKey];
-      patch.week = week; patch.sessions = sessions;
     }
+    if (stale || matured) { patch.week = week; patch.sessions = sessions; }
     return patch;
+  }
+
+  // Rebuild the live week once the calendar has moved past the one it was built for. Held
+  // off while a workout is running; the next housekeeping tick picks it up.
+  rollWeek() {
+    const s = this.state;
+    if (s.workout || !s.weekOf || s.weekOf >= this.weekKey(0)) return false;
+    this.save(this.reconcileWeekOverrides(s), null);
+    return true;
   }
 
   weekPhrase(offset) {
@@ -926,7 +983,7 @@ export default class App extends React.Component {
       const ex = cardio ? { ...item, cardio: true } : { ...item };
       sessions[day] = { ...prev, exercises: (prev.exercises || []).concat([ex]) };
       this.save({ week, sessions }, 'adding that exercise');
-      if (type === 'Custom' && (!prevType || prevType === 'Rest') && !((this.state.customLabels || {})[day])) this.setState({ tagRename: { day, value: '' } });
+      if (type === 'Custom' && (!prevType || prevType === 'Rest') && !((this.state.customLabels || {})[day])) this.setState({ tagRename: { day, value: '', scope: 'week', offset: 0 } });
       return;
     }
     const view = this.viewWeek(offset);
@@ -936,7 +993,7 @@ export default class App extends React.Component {
     const ex = cardio ? { ...item, cardio: true } : { ...item };
     const session = { ...base, exercises: (base.exercises || []).concat([ex]) };
     this.save({ weekOverrides: this.writeOverride(offset, day, type, session) }, 'adding that exercise');
-    if (type === 'Custom' && (!prevType || prevType === 'Rest') && !((this.state.customLabels || {})[day])) this.setState({ tagRename: { day, value: '' } });
+    if (type === 'Custom' && (!prevType || prevType === 'Rest') && !((this.state.customLabels || {})[day])) this.setState({ tagRename: { day, value: '', scope: 'week', offset } });
   }
 
   // Day type conversion: 'every' rewrites the recurring template; 'once' only the displayed week
@@ -1011,29 +1068,39 @@ export default class App extends React.Component {
   // state before anything is written, so a chain that loops back on itself — A onto B
   // while B goes to A — keeps both intact. Sources are cleared first and destinations
   // written last, so a slot that is both keeps whatever lands on it.
-  performMovePath(path) {
+  //
+  // `combine` keeps the final slot's workout instead: the arriving exercises are appended
+  // after its own, and the day becomes a "Custom" session for that week.
+  performMovePath(path, combine) {
     if (path.length < 2) return {};
     const taken = path.map(p => this.takeDay(p.day, p.off));
     const writes = path.map(p => ({ day: p.day, off: p.off, type: 'Rest', session: null }));
     for (let i = 0; i < path.length - 1; i++) {
       writes.push({ day: path[i + 1].day, off: path[i + 1].off, type: taken[i].type, session: taken[i].session });
     }
+    if (combine) {
+      const last = writes[writes.length - 1];
+      const host = taken[taken.length - 1].session || { exercises: [], completed: false, notes: '' };
+      const arriving = (last.session && last.session.exercises) || [];
+      const session = { ...host, exercises: (host.exercises || []).concat(arriving.map(e => ({ ...e }))), label: 'Custom', completed: false };
+      writes[writes.length - 1] = { ...last, type: 'Custom', session };
+    }
     return this.applyDayWrites(writes);
   }
 
   // Commit a move chain and report it. `discarded` names the session that the final slot
   // gave up, when the user chose to skip it rather than relocate it.
-  commitMovePath(path, discarded) {
+  commitMovePath(path, discarded, combinedWith) {
     const s = this.state;
     this.haptic(false);
-    const patch = this.performMovePath(path);
+    const patch = this.performMovePath(path, !!combinedWith);
     const reset = { moveOpen: false, moveSrc: null, moveConfirm: null, moveTargetOffset: null, movePath: null };
     const dest = path[1];
     if (s.breakMode) {
       const log = (s.recoveryLog || []).slice();
       for (let k = log.length - 1; k >= 0; k--) { if (log[k].choice === 'break' && !log[k].action) { log[k] = { ...log[k], action: 'moved_to_' + dest.day }; break; } }
       this.save({ ...patch, ...reset, recoveryLog: log, breakMode: false, activeDay: null, screen: 'week' }, 'the move');
-      this.showToast('Workout moved to ' + FULL[dest.day] + '. Rest well.');
+      this.showToast((combinedWith ? 'Workout combined into ' + FULL[dest.day] + "'s " + combinedWith + ' session' : 'Workout moved to ' + FULL[dest.day]) + '. Rest well.');
       return;
     }
     this.save({ ...patch, ...reset, ...(dest.off === 0 ? { activeDay: dest.day } : {}) }, 'the move');
@@ -1043,6 +1110,7 @@ export default class App extends React.Component {
       legs.push(FULL[path[i].day] + ' moved to ' + FULL[path[i + 1].day] + wk);
     }
     const tail = path[path.length - 1];
+    if (combinedWith) legs[legs.length - 1] = FULL[path[path.length - 2].day] + ' combined into ' + FULL[tail.day] + "'s " + combinedWith + ' — now "Custom"';
     this.showToast(legs.join(' · ') + '.' + (discarded ? ' ' + FULL[tail.day] + "'s " + discarded + ' session was skipped.' : ''));
   }
 
@@ -1071,6 +1139,17 @@ export default class App extends React.Component {
     const cur = this.state.sessions[day];
     if (!cur || cur.label == null) return {};
     return { sessions: { ...this.state.sessions, [day]: { ...cur, label } } };
+  }
+
+  // Week-scoped day name: written onto that week's session (null drops it, so the day
+  // falls back to its standing Current Programme name). customLabels is never touched.
+  weekLabelPatch(day, off, label) {
+    const view = this.viewWeek(off);
+    const cur = view.sessions[day];
+    if (!cur) return {};
+    const next = { ...cur };
+    if (label == null) delete next.label; else next.label = label;
+    return this.applyDayWrites([{ day, off, type: view.types[day] || 'Rest', session: next }]);
   }
 
   // The name currently shown for a day in the live week — the moved session's label if
@@ -1192,12 +1271,6 @@ export default class App extends React.Component {
     return list.filter((e, i) => !e.cardio && i !== f.index && e.name && e.name !== f.name).map(e => e.name);
   }
 
-  removeProgramExerciseAt(day, index) {
-    const p = this.state.program[day];
-    if (!p) return this.state.program;
-    const exercises = (p.exercises || []).filter((_, i) => i !== index);
-    return { ...this.state.program, [day]: { ...p, exercises } };
-  }
 
   haptic(strong) { try { navigator.vibrate && navigator.vibrate(strong ? [10, 40, 10] : 8); } catch (e) {} }
 
@@ -2624,7 +2697,7 @@ export default class App extends React.Component {
       stars: [{ top: 2, left: 2, delay: 0 }, { top: 6, left: 30, delay: 0.4 }, { top: 24, left: 2, delay: 0.8 }, { top: 28, left: 28, delay: 1.2 }],
     };
     const screen = s.screen;
-    const openDay = (d) => () => this.setState({ screen: 'session', activeDay: d, activeSlot: 'a', sessionPeek: null });
+    const openDay = (d) => () => this.setState({ screen: 'session', activeDay: d, activeSlot: 'a', sessionPeek: null, completedView: null });
 
     const wOff = s.weekOffset || 0;
     const wView = this.viewWeek(wOff);
@@ -2705,7 +2778,7 @@ export default class App extends React.Component {
           sub: sl === 'b' ? 'Second workout' : 'Main workout',
           bg: sl === aslot ? 'var(--text)' : 'var(--surface-2)',
           color: sl === aslot ? 'var(--surface)' : 'var(--muted)',
-          pick: () => this.setState({ activeSlot: sl, sessionPeek: null, sessDrag: null }),
+          pick: () => this.setState({ activeSlot: sl, sessionPeek: null, completedView: null, sessDrag: null }),
         })),
         showAddWorkout: !aExtra && !asess.skipped,
         showRemoveExtra: aslot === 'b',
@@ -2754,7 +2827,7 @@ export default class App extends React.Component {
         showBulkEdit: exs.length > 0,
         // #57 — the session stays editable after it's been completed and rated.
         completedNote: asess.completed ? 'Completed — any edit here updates your logged session.' : '',
-        doneTitle: at === 'Cardio' ? 'Session Done for Today.' : 'Lift Done for Today.',
+        doneTitle: (at === 'Cardio' ? 'Session Done' : 'Lift Done') + (ad === s.todayKey ? ' for Today.' : ' for ' + FULL[ad] + '.'),
         emptyTitle: at === 'Cardio' ? 'No activities yet' : 'No exercises yet',
         emptySub: at === 'Cardio' ? 'Tap + to add a cardio activity' : 'Tap + to log your first exercise',
         totalVolume: fmt(total),
@@ -2810,7 +2883,7 @@ export default class App extends React.Component {
           // instead of the literal word "Custom".
           set: () => {
             this.updateProgramDay(apd, { type: t });
-            if (t === 'Custom') this.setState({ tagRename: { day: apd, value: (this.state.customLabels || {})[apd] || '' } });
+            if (t === 'Custom') this.setState({ tagRename: { day: apd, value: (this.state.customLabels || {})[apd] || '', scope: 'program' } });
           },
         })),
         showExercises: training,
@@ -3081,13 +3154,7 @@ export default class App extends React.Component {
     // Built only for the screen that reads it: mapping every logged session (and its
     // exercises) on every render costs ~9ms once a few hundred sessions pile up, and the
     // rest timer re-renders once a second.
-    const historyEntries = (screen !== 'history' ? [] : (s.sessionHistory || []).slice().sort((a, b) => (a.date < b.date ? 1 : -1)).map(h => ({
-      title: this.recordTitle(h),
-      dateLabel: fmtDate(h.date) + (h.rpe != null ? ' · RPE ' + h.rpe + '/10' : ''),
-      volume: fmt(this.recordVolume(h)),
-      // The sets as logged — a session that ran long or short reads as it happened.
-      exercises: this._groupedRows(h.exercises, e => ({ name: e.name, scheme: loggedLine(e) })),
-    })));
+    const historyEntries = (screen !== 'history' ? [] : (s.sessionHistory || []).slice().sort((a, b) => (a.date < b.date ? 1 : -1)).map(h => this.historyEntry(h)));
 
     // exercise database
     const abp = s.activeBodyPart;
@@ -3163,11 +3230,11 @@ export default class App extends React.Component {
             const x = this.slotSession(st.day, 'b');
             if (x) this.save({ sessions: this.patchSlot(st.day, 'b', { exercises: (x.exercises || []).concat([cardio ? { ...item, cardio: true } : item]) }) }, 'adding that exercise');
           }
-          else if (st.recur === 'every') { if (cardio) this.addCardioToProgram(st.day, item); else this.addExerciseToProgram(st.day, item); }
+          else if (st.recur === 'every' && st.fromProgram) { if (cardio) this.addCardioToProgram(st.day, item); else this.addExerciseToProgram(st.day, item); }
           else { this.addOneTimeToWeek(st.day, item, cardio, st.offset || 0); }
           this.haptic(true);
           this.setState({ quickAdd: null });
-          this.showToast(st.item.name + ' added to ' + FULL[st.day] + (st.slot === 'b' ? ' — second workout.' : (st.recur === 'every' ? ' — every week.' : (st.offset ? ' — that week.' : ' — just this week.'))));
+          this.showToast(st.item.name + ' added to ' + FULL[st.day] + (st.slot === 'b' ? ' — second workout.' : ((st.recur === 'every' && st.fromProgram) ? ' — every week.' : (st.offset ? ' — that week.' : ' — just this week.'))));
         };
 
     if (qa0) {
@@ -3234,9 +3301,9 @@ export default class App extends React.Component {
         onDistance: (e) => this.setState({ quickAdd: { ...this.state.quickAdd, distance: numOrEmpty(e.target.value, true) } }),
         efforts: this._effortChips(qa0.rpe || 5, (n) => this.setState({ quickAdd: { ...this.state.quickAdd, rpe: n } })),
         itemName: qa0.item ? qa0.item.name : '', configLabel,
-        // A second workout isn't part of the recurring template, so there is nothing
-        // to choose between "just today" and "every week" — commit straight away.
-        toRecur: () => { const st = this.state.quickAdd; if (st && st.slot === 'b') { commitQuickAdd(); return; } this.setState({ quickAdd: { ...st, stage: 'recur' } }); },
+        // Only Current Programme can add "every week"; anywhere else (a second workout, a
+        // day on the week view or session screen) it's this week's, so commit straight away.
+        toRecur: () => { const st = this.state.quickAdd; if (st && (st.slot === 'b' || !st.fromProgram)) { commitQuickAdd(); return; } this.setState({ quickAdd: { ...st, stage: 'recur' } }); },
         recurOptions: [
           { k: 'once', label: 'Just today', sub: 'One-time — ' + FULL[day] + ' stays empty next week' },
           { k: 'every', label: 'Every ' + FULL[day], sub: 'Repeats weekly in your program' },
@@ -3265,7 +3332,8 @@ export default class App extends React.Component {
       const strengthN = exs.filter(e => !e.cardio).length;
       const cardioN = exs.filter(e => e.cardio).length;
       const hasActivities = exs.length > 0;
-      const scope = dm0.scope;
+      // Outside Current Programme a day can only change for its own week: no "every week".
+      const scope = src === 'week' ? 'once' : dm0.scope;
       const onceLabelSuffix = mOff ? ' — that week.' : ' — this week.';
       const curLabel = dayTypeName(type, day, cl, true, daySess && daySess.label);
       const clearParts = [];
@@ -3281,7 +3349,7 @@ export default class App extends React.Component {
           this.applyDayConvert(day, targetType, scope, mOff);
           if (targetType === 'Custom') {
             // New lift day: let the user name it right away instead of leaving it "Custom".
-            this.setState({ dayMenu: null, tagRename: { day, value: (this.state.customLabels || {})[day] || '' } });
+            this.setState({ dayMenu: null, tagRename: { day, value: (this.state.customLabels || {})[day] || '', scope: scope === 'every' ? 'program' : 'week', offset: mOff } });
           } else {
             this.setState({ dayMenu: null });
             this.showToast(FULL[day] + ' is now a ' + toName[to] + ' day' + (scope === 'every' ? ' — every week.' : onceLabelSuffix));
@@ -3295,6 +3363,7 @@ export default class App extends React.Component {
         onceBg: scope === 'once' ? 'var(--accent)' : 'transparent', onceColor: scope === 'once' ? '#fff' : 'var(--muted)',
         everyBg: scope === 'every' ? 'var(--accent)' : 'transparent', everyColor: scope === 'every' ? '#fff' : 'var(--muted)',
         everyLabel: 'Every ' + FULL[day],
+        showScope: src !== 'week',
         onceLabel: mOff ? 'Just that week' : 'Just this week',
         hasPeek: mOff !== 0 && exs.length > 0,
         peekItems: mOff !== 0 ? exs.map(e => ({ name: e.name, detail: scheme(e) })) : [],
@@ -3317,7 +3386,7 @@ export default class App extends React.Component {
         showAddEmpty: !hasActivities && type !== 'Rest',
         addActivity: () => {
           const qk = type === 'Cardio' ? 'cardio' : (isLiftType && hasActivities ? 'lift' : null);
-          this.setState({ dayMenu: null, quickAdd: { day, stage: qk ? 'browseCat' : 'type', kind: qk, cat: null, item: null, sets: 3, reps: 10, duration: 30, intensity: 'Moderate', recur: scope, offset: mOff } });
+          this.setState({ dayMenu: null, quickAdd: { day, stage: qk ? 'browseCat' : 'type', kind: qk, cat: null, item: null, sets: 3, reps: 10, duration: 30, intensity: 'Moderate', recur: scope, offset: mOff, fromProgram: src !== 'week' } });
         },
         showMove: src === 'week' && type !== 'Rest',
         moveToDay: () => this.setState({ dayMenu: null, moveSrc: { day, offset: mOff }, moveConfirm: null, moveTargetOffset: null, movePath: null, moveOpen: true }),
@@ -3335,7 +3404,7 @@ export default class App extends React.Component {
           const c = this.state.dayConfirm; if (!c) return;
           this.applyDayConvert(c.day, c.targetType, c.scope, c.offset || 0);
           if (c.targetType === 'Custom') {
-            this.setState({ dayConfirm: null, dayMenu: null, tagRename: { day: c.day, value: (this.state.customLabels || {})[c.day] || '' } });
+            this.setState({ dayConfirm: null, dayMenu: null, tagRename: { day: c.day, value: (this.state.customLabels || {})[c.day] || '', scope: c.scope === 'every' ? 'program' : 'week', offset: c.offset || 0 } });
           } else {
             this.setState({ dayConfirm: null, dayMenu: null });
             this.showToast(FULL[c.day] + ' is now a ' + toName[c.to] + ' day' + (c.scope === 'every' ? ' — every week.' : onceLabelSuffix));
@@ -3366,18 +3435,16 @@ export default class App extends React.Component {
       const isFreed = !!freed && freed.off === toOff && freed.day === d;
       const tType = isFreed ? 'Rest' : (toView.types[d] || 'Rest');
       const occupied = tType !== 'Rest';
-      const disabled = breakMode && occupied;
       const basePath = mpath || [{ day: mv.day, off: srcOff }];
       return {
         full: FULL[d],
         current: isFreed ? 'Free after this move' : (occupied ? dayTypeName(tType, d, cl, true, (toView.sessions[d] || {}).label) : 'Rest'),
         divider: i === arr.length - 1 ? 'transparent' : 'var(--border)',
-        rowOpacity: disabled ? 0.4 : 1,
-        rowCursor: disabled ? 'not-allowed' : 'pointer',
+        rowOpacity: 1,
+        rowCursor: 'pointer',
         pick: () => {
-          if (disabled) { this.showToast('That day already has a workout — pick a free day.'); return; }
-          // Occupied target: ask whether to relocate what's there or skip it (break mode
-          // disables these rows, so it never reaches the prompt).
+          // Occupied target: ask whether to skip what's there, combine with it, or
+          // relocate it. Every outcome is week-only — a move never touches the master.
           if (occupied) { this.setState({ moveConfirm: { path: basePath, to: d, toOff } }); return; }
           this.commitMovePath(basePath.concat([{ day: d, off: toOff }]));
         },
@@ -3997,7 +4064,10 @@ export default class App extends React.Component {
       run: () => this.exportNutritionPdf(),
     } : null;
     const restState = screen === 'session' && (!at || at === 'Rest');
-    const completionState = screen === 'session' && !!sx && !!asess && asess.completed && ad === s.todayKey && s.sessionPeek !== (ad + ':' + aslot);
+    const completionState = screen === 'session' && !!sx && !!asess && asess.completed && s.sessionPeek !== (ad + ':' + aslot);
+    // Read-only view of the completed workout as logged (eye button). Falls back to the
+    // session itself when this week's record is missing.
+    const cvRec = (s.completedView && completionState) ? (this.historyRecordFor(ad, aslot) || { day: ad, slot: aslot, type: at, label: aslot === 'b' ? slotName('b') : asess.label, date: this.weekDayISO(0, ad), exercises: asess.exercises || [], notes: asess.notes, rpe: asess.rpe }) : null;
     const sessionNormal = screen === 'session' && !!sx && !completionState;
 
     return {
@@ -4192,7 +4262,9 @@ export default class App extends React.Component {
       mealDetailOpen: !!md,
       closeMealDetail: () => this.setState({ mealDetail: null }),
       restState, completionState, sessionNormal,
-      peekSession: () => this.setState({ sessionPeek: ad + ':' + aslot }),
+      viewCompleted: () => this.setState({ completedView: true }),
+      completedViewOpen: !!cvRec,
+      cv: cvRec ? { ...this.historyEntry(cvRec), close: () => this.setState({ completedView: null }) } : null,
       wo, woActive: !!wo, wsx, wsOpenFlag: !!s.wsOpen,
       startWorkout: () => this.startWorkout(),
       printNutrition: !!s.nutritionPrint,
@@ -4374,22 +4446,11 @@ export default class App extends React.Component {
               }
               return next;
             });
-            // The recurring template follows along for the main workout, so next week
-            // starts from the corrected numbers rather than the old ones.
-            let program = this.state.program;
-            if (b.slot === 'a' && program[b.day]) {
-              const prog = program[b.day];
-              const pex = (prog.exercises || []).map((e, i) => {
-                const li = list[i];
-                if (!li || li.name !== e.name) return e;
-                return e.cardio ? { ...e, duration: li.duration, distance: li.distance, rpe: li.rpe, intensity: li.intensity } : { ...e, sets: li.sets, reps: li.reps, weight: li.weight };
-              });
-              program = { ...program, [b.day]: { ...prog, exercises: pex } };
-            }
+            // This week's workout only — the master is edited in Current Programme.
             this.haptic(true);
             this.setState({ bulkEdit: null });
-            this.saveSessionExercises(b.day, b.slot, list, { program });
-            this.showToast('Workout updated' + (b.slot === 'a' ? ' — this week and your program.' : '.'));
+            this.saveSessionExercises(b.day, b.slot, list, null);
+            this.showToast('Workout updated for this week.');
           },
         };
       })() : null,
@@ -4547,16 +4608,21 @@ export default class App extends React.Component {
       ef,
       closeExSheet: () => this.setState({ exForm: null }),
       browseDb: () => { const f = this.state.exForm; if (!f) return; this.setState({ exForm: null, quickAdd: { day: f.day, stage: 'type', kind: null, cat: null, item: null, sets: 3, reps: 10, duration: 30, intensity: 'Moderate', recur: 'once', offset: 0 } }); },
-      openTagRename: () => this.setState({ tagRename: { day: ad, value: this.effectiveDayLabel(ad) } }),
+      openTagRename: () => this.setState({ tagRename: { day: ad, value: this.effectiveDayLabel(ad), scope: 'week', offset: 0 } }),
       tagRenameOpen: !!s.tagRename,
       tr: s.tagRename ? {
         dayFull: FULL[s.tagRename.day], value: s.tagRename.value,
         onChange: (e) => this.setState({ tagRename: { ...this.state.tagRename, value: e.target.value } }),
         close: () => this.setState({ tagRename: null }),
-        reset: () => { const day = s.tagRename.day; const m = { ...(this.state.customLabels || {}) }; delete m[day]; const sp = this.sessionLabelPatch(day, ''); this.setState({ tagRename: null }); this.save({ customLabels: m, ...sp }, 'the day name'); this.showToast('Day tag reset to Custom.'); },
+        reset: () => {
+          const tr0 = s.tagRename; const day = tr0.day;
+          if (tr0.scope !== 'program') { this.setState({ tagRename: null }); this.save(this.weekLabelPatch(day, tr0.offset || 0, null), 'the day name'); this.showToast('Day tag reset for this week.'); return; }
+          const m = { ...(this.state.customLabels || {}) }; delete m[day]; const sp = this.sessionLabelPatch(day, ''); this.setState({ tagRename: null }); this.save({ customLabels: m, ...sp }, 'the day name'); this.showToast('Day tag reset to Custom.'); },
         save: () => {
-          const day = this.state.tagRename.day;
-          const v = (this.state.tagRename.value || '').trim();
+          const tr0 = this.state.tagRename; const day = tr0.day;
+          const v = (tr0.value || '').trim();
+          // Named outside Current Programme: the name belongs to that week's session only.
+          if (tr0.scope !== 'program') { this.setState({ tagRename: null }); this.save(this.weekLabelPatch(day, tr0.offset || 0, v || null), 'the day name'); if (v) this.showToast('Day renamed to "' + v + '" for this week.'); return; }
           const m = { ...(this.state.customLabels || {}) };
           if (v) m[day] = v; else delete m[day];
           const sp = this.sessionLabelPatch(day, v);
@@ -4576,14 +4642,8 @@ export default class App extends React.Component {
           const day = f.day; const slot = f.slot || 'a';
           const sess = this.slotSession(day, slot); if (!sess) { this.setState({ exForm: null }); return; }
           const list = this._applyExerciseEdit(sess.exercises, f.index, item, f.origPartner);
-          // The recurring template mirrors the day's main workout only — a second
-          // workout is a one-off for that day and never rewrites the program.
-          let extra = null;
-          if (slot === 'a') {
-            const prog = s.program[day];
-            extra = prog ? { program: { ...s.program, [day]: { ...prog, exercises: this._applyExerciseEdit(prog.exercises, (f.index === null || f.index >= (prog.exercises || []).length) ? null : f.index, item, f.origPartner).map(x => { const c = { ...x }; delete c.logged; return c; }) } } } : null;
-          }
-          this.saveSessionExercises(day, slot, list, extra);
+          // Edits on a day's session stay in that week; the master is Current Programme.
+          this.saveSessionExercises(day, slot, list, null);
         }
         if (item.supersetWith && f.supersetWith && this._supersetChoices(f).indexOf(f.supersetWith) < 0) this.showToast(f.supersetWith + ' added as a superset with ' + item.name + '.');
         this.setState({ exForm: null });
@@ -4600,16 +4660,14 @@ export default class App extends React.Component {
           const gone = (sess.exercises || [])[f.index];
           const unpair = (x) => this._unpair(x, gone);
           const list = (sess.exercises || []).filter((_, i) => i !== f.index).map(unpair);
-          let program = slot === 'a' ? this.removeProgramExerciseAt(day, f.index) : null;
-          if (program && program[day]) program = { ...program, [day]: { ...program[day], exercises: (program[day].exercises || []).map(unpair) } };
-          this.saveSessionExercises(day, slot, list, program ? { program } : null);
+          this.saveSessionExercises(day, slot, list, null);
         }
         this.setState({ exForm: null });
       },
 
       moveOpen: s.moveOpen,
       moveTitle: breakMode ? 'Reschedule tomorrow' : ((mpath ? 'Rehome ' : 'Move ') + (mv ? FULL[mv.day] : '') + ' session'),
-      moveSub: breakMode ? 'Rest day confirmed. Move this workout to a free day within the week.'
+      moveSub: breakMode ? 'Rest day confirmed. Move this workout to another day this week.'
         : (mpath ? (FULL[mpath[mpath.length - 2].day] + ' is taking ' + FULL[mv.day] + ' — pick where this session goes instead.')
           : 'Shifts this one session only — your recurring schedule stays the same.'),
       moveTargets,
@@ -4625,13 +4683,14 @@ export default class App extends React.Component {
         nextOpacity: toOff >= moveWeekHi ? '.3' : '1',
       },
       moveConfirmOpen: !!mc,
-      moveConfirmTitle: mc ? (FULL[mc.to] + (mc.toOff !== srcOff ? ' (' + this.weekPhrase(mc.toOff).toLowerCase() + ')' : '') + ' already has a workout') : '',
-      moveConfirmBody: mc ? ('Move its ' + mcName + ' session to another day, or skip it? Skipping drops that session from the week.') : '',
-      moveConfirmRelocateLabel: mc ? ('Move ' + mcName + ' to another day') : '',
+      moveConfirmTitle: mc ? (FULL[mc.to] + (mc.toOff !== srcOff ? ' (' + this.weekPhrase(mc.toOff).toLowerCase() + ')' : '') + " already has a workout: '" + mcName + "'. What would you like to do?") : '',
+      moveConfirmBody: mc ? ('Skip replaces ' + mcName + ' for that week. Combine adds this workout after its exercises as a "Custom" day. Changes apply to that week only.') : '',
+      moveConfirmRelocateLabel: mc ? ('Move ' + mcName + ' elsewhere') : '',
       // Both branches extend the chain with the contested slot; relocating keeps picking,
       // skipping commits and lets the chain's tail fall away.
       moveConfirmRelocate: () => { if (mc) this.setState({ movePath: mc.path.concat([{ day: mc.to, off: mc.toOff }]), moveSrc: { day: mc.to, offset: mc.toOff }, moveTargetOffset: mc.toOff, moveConfirm: null }); },
       moveConfirmSkip: () => { if (mc) this.commitMovePath(mc.path.concat([{ day: mc.to, off: mc.toOff }]), mcName); },
+      moveConfirmCombine: () => { if (mc) this.commitMovePath(mc.path.concat([{ day: mc.to, off: mc.toOff }]), null, mcName); },
       moveConfirmCancel: () => this.setState({ moveConfirm: null }),
       closeMove: () => this.setState({ moveOpen: false, moveSrc: null, moveConfirm: null, moveTargetOffset: null, movePath: null, breakMode: false }),
     };

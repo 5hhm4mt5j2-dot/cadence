@@ -40,10 +40,12 @@ export default function DayMenu({ v }) {
               </>
             )}
 
+            {dm.showScope && (
             <div style={s('display:flex; gap:6px; margin-top:16px; background:var(--surface-2); border:1px solid var(--border); border-radius:12px; padding:4px;')}>
               <button onClick={dm.setOnce} style={s(`flex:1; border:none; cursor:pointer; font-family:inherit; font-size:12px; font-weight:700; padding:9px 0; border-radius:9px; background:${dm.onceBg}; color:${dm.onceColor};`)}>{dm.onceLabel}</button>
               <button onClick={dm.setEvery} style={s(`flex:1; border:none; cursor:pointer; font-family:inherit; font-size:12px; font-weight:700; padding:9px 0; border-radius:9px; background:${dm.everyBg}; color:${dm.everyColor};`)}>{dm.everyLabel}</button>
             </div>
+            )}
 
             <div style={s('display:flex; flex-direction:column; gap:9px; margin-top:16px;')}>
               {dm.changeOptions.map((o, i) => (

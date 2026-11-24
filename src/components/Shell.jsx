@@ -4,7 +4,7 @@ import TopBar from './TopBar';
 import PrintArea from './PrintArea';
 
 import WeekScreen from '../screens/WeekScreen';
-import SessionScreen from '../screens/SessionScreen';
+import SessionScreen, { CompletedView } from '../screens/SessionScreen';
 import { DatabaseScreen, DatabaseDetailScreen } from '../screens/DatabaseScreen';
 import { CardioDbScreen, CardioDbDetailScreen } from '../screens/CardioDbScreen';
 import ProgramScreen from '../screens/ProgramScreen';
@@ -86,6 +86,7 @@ export default function Shell({ v }) {
         {v.profileEditOpen && <ProfileEditSheet v={v} />}
         {v.menuOpen && <SideMenu v={v} />}
         {v.moveOpen && <MoveLift v={v} />}
+        {v.completedViewOpen && <CompletedView v={v} />}
         {v.weightFormOpen && <WeightLog v={v} />}
         {v.addWorkoutOpen && <AddWorkout v={v} />}
         {v.bulkOpen && <BulkEdit v={v} />}
