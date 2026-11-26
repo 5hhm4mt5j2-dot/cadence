@@ -1710,7 +1710,6 @@ export default class App extends React.Component {
 
   startGreetPress() {
     if (!this.state.profile) return;
-    this._greetMoved = false;
     clearTimeout(this._greetLp);
     this._greetLp = setTimeout(() => { this.haptic(true); this.setState({ profileMenu: true }); }, 480);
   }
@@ -1726,7 +1725,7 @@ export default class App extends React.Component {
     this.haptic(true);
     this.setState({ flowPhase: 'done', tutRect: null, tutStep: 0 });
     this.save({ tutorialDone: TUT_VERSION }, null);
-    try { localStorage.setItem('cadenceTutorialComplete', 'true'); localStorage.setItem('lt_tut_step', '0'); } catch (e) {}
+    try { localStorage.setItem('lt_tut_step', '0'); } catch (e) {}
     if (skipped) this.showToast('You can replay the tutorial from Menu → Replay Tutorial.');
   }
 

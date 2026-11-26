@@ -607,7 +607,7 @@ export {
   PACES,
   migrateCardioDb, fmt, fmtDate, fmtDateShort, migrateArchive, exVol, W_DEFAULTS, scheme,
   weekStartISO, daySpan, KCAL_PER_KG, localISO, fixUtcDates, topWeight, loggedLine, exerciseNotes,
-  supersetPartners, groupSupersets, pruneSupersets, repairSupersets,
+  supersetPartners, groupSupersets, repairSupersets,
   isTimed, isBodyweight, fmtSecs, parseSecs, hasRange, repTarget, loadLabel, setVol, exHoldSecs,
   cardioRpe, rpeIntensity, cardioLine,
   seedSessions, seedExerciseDb, migrateExerciseDb, eqToOptions, eqLabel, KEY, BODY_PARTS,
