@@ -47,6 +47,8 @@ const dayTypeName = (type, dayKey, customLabels, withDay, label) => {
 // tour should see the new one once. `tutorialDone` stores the version seen (legacy
 // saves stored `true`, which counts as version 1).
 const TUT_VERSION = 2;
+// Legacy shim: the `done === true` branch can go once tour v2 (shipped 2026-11-27) has
+// rewritten old saves' `true` to a version number.
 const tutSeen = (done) => (done === true ? 1 : (done | 0)) >= TUT_VERSION;
 const TUT_STEPS = [
   { title: 'Welcome to Cadence', text: "Cadence tracks your lifts, cardio, meals, body weight and recovery in one place. Long-press your greeting to edit your profile and targets, see your recovery profile, or export and import your data.", target: 'greet' },
