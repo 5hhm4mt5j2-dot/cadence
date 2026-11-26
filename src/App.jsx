@@ -255,6 +255,8 @@ export default class App extends React.Component {
   }
 
   componentDidMount() {
+    // Before anything can make a sound: mix with other apps' audio, never take it over.
+    this._woAudioSession();
     try { const wc = JSON.parse(localStorage.getItem('lt_workout_settings') || 'null'); if (wc) this.setState({ wcfg: { ...W_DEFAULTS, ...wc } }); } catch (e) {}
     // Coming back to a backgrounded app can cross a week boundary, which is when last
     // week's completed flags and logged sets turn stale — re-check straight away rather
@@ -1382,42 +1384,47 @@ export default class App extends React.Component {
   _woVibrate() { try { if (navigator.vibrate) navigator.vibrate([90, 60, 90]); } catch (e) {} }
 
   // ---- rest-timer chime (#12) ----
-  // The chime is synthesised — there is no audio file to resolve. It used to be created
-  // lazily when the timer ran out, which is never inside a user gesture, so browsers kept
-  // the AudioContext suspended and nothing played. Now every Start / Log tap unlocks
-  // audio ahead of time: it resumes the AudioContext and primes an <audio> element with a
-  // silent play. The chime itself goes through that <audio> element first (a generated
-  // WAV — media playback, which iOS doesn't route through the silent switch the way it
-  // does Web Audio) and falls back to the oscillators if the element is refused.
+  // The chime is synthesised — there is no audio file to resolve — and it only ever goes
+  // through Web Audio. It must never interrupt the user's music (Spotify, a radio tab):
+  //  - the page's audio session is 'ambient', so on iOS the chime mixes with other audio
+  //    instead of taking the session over (this also means the silent switch mutes it);
+  //  - there is no <audio> element and no Media Session — HTMLMediaElement playback, even
+  //    a muted priming play, claims the session on iOS and pauses whatever else is playing;
+  //  - nothing here pauses or suspends media the app didn't create.
+  // Browsers keep an AudioContext suspended unless it's resumed inside a user gesture, and
+  // the timer runs out outside one, so every Start / Log tap unlocks the shared context
+  // ahead of time. Each chime is a short-lived buffer source on that context.
+  _woAudioSession() {
+    try { if (navigator.audioSession && navigator.audioSession.type !== 'ambient') navigator.audioSession.type = 'ambient'; } catch (e) {}
+  }
+  _woAudioCtx() {
+    this._woAudioSession();
+    if (this._actx) return this._actx;
+    const AC = window.AudioContext || window.webkitAudioContext;
+    return AC ? (this._actx = new AC()) : null;
+  }
   _woUnlockAudio() {
-    try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (e) {}
     try {
-      const AC = window.AudioContext || window.webkitAudioContext;
-      if (AC) {
-        const ctx = this._actx || (this._actx = new AC());
-        if (ctx.state === 'suspended') ctx.resume().catch(err => console.warn('[cadence] audio unlock: resume failed', err));
+      const ctx = this._woAudioCtx(); if (!ctx) return;
+      if (ctx.state !== 'running') ctx.resume().catch(err => console.warn('[cadence] audio unlock: AudioContext resume rejected', err));
+      // A one-sample silent buffer started inside the gesture is what older iOS needs.
+      if (!this._chimeUnlocked) {
+        const src = ctx.createBufferSource();
+        src.buffer = ctx.createBuffer(1, 1, ctx.sampleRate);
+        src.connect(ctx.destination); src.start(0);
+        this._chimeUnlocked = true;
       }
-    } catch (e) { console.warn('[cadence] audio unlock failed', e); }
-    if (this._chimeUnlocked) return;
-    try {
-      const el = this._chimeEl || (this._chimeEl = new Audio());
-      el.muted = true; el.src = this._chimeUrl('silent');
-      const p = el.play();
-      const done = () => { el.pause(); el.muted = false; this._chimeUnlocked = true; };
-      if (p && p.then) p.then(done).catch(err => { el.muted = false; console.warn('[cadence] audio unlock: priming play() rejected', err); });
-      else done();
     } catch (e) { console.warn('[cadence] audio unlock failed', e); }
   }
 
-  // A short mono 16-bit WAV for each sound, built once and kept as a blob URL.
-  _chimeUrl(type) {
+  // Each sound rendered once into an AudioBuffer for the context.
+  _chimeBuffer(ctx, type) {
     this._chimes = this._chimes || {};
     if (this._chimes[type]) return this._chimes[type];
-    const rate = 22050;
-    const tones = type === 'beep' ? [[660, 0, .16, .3, true], [660, .26, .16, .3, true]]
-      : (type === 'silent' ? [] : [[880, 0, .5, .4], [1174.66, .16, .6, .4]]);
-    const len = Math.ceil(rate * (type === 'silent' ? .1 : (type === 'beep' ? .5 : .85)));
-    const data = new Float32Array(len);
+    const rate = ctx.sampleRate;
+    const tones = type === 'beep' ? [[660, 0, .16, .3, true], [660, .26, .16, .3, true]] : [[880, 0, .5, .4], [1174.66, .16, .6, .4]];
+    const len = Math.ceil(rate * (type === 'beep' ? .5 : .85));
+    const buf = ctx.createBuffer(1, len, rate), data = buf.getChannelData(0);
     tones.forEach(([f, at, dur, amp, square]) => {
       const s0 = Math.floor(at * rate), n = Math.floor(dur * rate);
       for (let i = 0; i < n && s0 + i < len; i++) {
@@ -1427,40 +1434,31 @@ export default class App extends React.Component {
         data[s0 + i] += amp * env * (square ? Math.sign(ph) : ph);
       }
     });
-    const buf = new ArrayBuffer(44 + len * 2), dv = new DataView(buf);
-    const str = (o, x) => { for (let i = 0; i < x.length; i++) dv.setUint8(o + i, x.charCodeAt(i)); };
-    str(0, 'RIFF'); dv.setUint32(4, 36 + len * 2, true); str(8, 'WAVE'); str(12, 'fmt ');
-    dv.setUint32(16, 16, true); dv.setUint16(20, 1, true); dv.setUint16(22, 1, true);
-    dv.setUint32(24, rate, true); dv.setUint32(28, rate * 2, true); dv.setUint16(32, 2, true); dv.setUint16(34, 16, true);
-    str(36, 'data'); dv.setUint32(40, len * 2, true);
-    for (let i = 0; i < len; i++) dv.setInt16(44 + i * 2, Math.max(-1, Math.min(1, data[i])) * 32767, true);
-    this._chimes[type] = URL.createObjectURL(new Blob([buf], { type: 'audio/wav' }));
-    return this._chimes[type];
+    for (let i = 0; i < len; i++) data[i] = Math.max(-1, Math.min(1, data[i]));
+    return (this._chimes[type] = buf);
   }
 
   _woSound(type) {
     const t = type || (this.state.wcfg || W_DEFAULTS).sound;
     if (!t || t === 'silent') return;
-    const viaWebAudio = () => {
-      try {
-        const ctx = this._actx || (this._actx = new (window.AudioContext || window.webkitAudioContext)());
-        if (ctx.state === 'suspended') ctx.resume().catch(err => console.warn('[cadence] rest chime: AudioContext resume rejected', err));
-        const mk = (f, at, dur) => { const o = ctx.createOscillator(), g = ctx.createGain(); o.type = t === 'beep' ? 'square' : 'sine'; o.frequency.value = f; const t0 = ctx.currentTime + at; g.gain.setValueAtTime(.0001, t0); g.gain.exponentialRampToValueAtTime(t === 'beep' ? .12 : .2, t0 + .02); g.gain.exponentialRampToValueAtTime(.0001, t0 + dur); o.connect(g); g.connect(ctx.destination); o.start(t0); o.stop(t0 + dur + .05); };
-        if (t === 'beep') { mk(660, 0, .16); mk(660, .26, .16); } else { mk(880, 0, .5); mk(1174.66, .16, .6); }
-      } catch (e) {
-        // No way to make a sound at all — at least buzz where the device can.
-        console.warn('[cadence] rest chime: Web Audio unavailable', e);
-        this._woVibrate();
-      }
-    };
+    // The app plays no music of its own, so there's nothing app-owned to duck here; the
+    // ambient session lets the OS mix the chime over other apps' audio.
     try {
-      const el = this._chimeEl || (this._chimeEl = new Audio());
-      el.muted = false; el.src = this._chimeUrl(t);
-      const p = el.play();
-      if (p && p.catch) p.catch(err => { console.warn('[cadence] rest chime: <audio> play() rejected, falling back to Web Audio', err); viaWebAudio(); });
+      const ctx = this._woAudioCtx();
+      if (!ctx) throw new Error('Web Audio unavailable');
+      const play = () => {
+        const src = ctx.createBufferSource();
+        src.buffer = this._chimeBuffer(ctx, t);
+        src.connect(ctx.destination);
+        src.onended = () => src.disconnect();
+        src.start(0);
+      };
+      if (ctx.state === 'running') play();
+      else ctx.resume().then(play).catch(err => { console.warn('[cadence] rest chime: AudioContext resume rejected — chime blocked', err); this._woVibrate(); });
     } catch (e) {
-      console.warn('[cadence] rest chime: <audio> failed, falling back to Web Audio', e);
-      viaWebAudio();
+      // No way to make a sound at all — at least buzz where the device can.
+      console.warn('[cadence] rest chime: Web Audio failed', e);
+      this._woVibrate();
     }
   }
   _mkHold(field, delta) {

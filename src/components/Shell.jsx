@@ -18,7 +18,7 @@ import QuickAdd from '../sheets/QuickAdd';
 import DayMenu from '../sheets/DayMenu';
 import { MealAddSheet, MealDetailSheet, SavedMealDetailSheet, NutritionExportSheet } from '../sheets/MealSheets';
 import { WorkoutSettingsSheet, RpeSheet, RecoveryPrompt, RecoveryView } from '../sheets/RecoverySheets';
-import { ImportConfirm, ImportLoading, Toast, TagRename, CompleteConfirm, ProfileEditSheet, SideMenu, MoveLift, SupplementsEdit, WeightLog, ProgramRename, AddWorkout, BulkEdit, UndoButton, RestartConfirm } from '../sheets/MiscSheets';
+import { ImportConfirm, ImportLoading, Toast, TagRename, CompleteConfirm, ProfileEditSheet, SideMenu, MoveLift, SupplementsEdit, WeightLog, ProgramRename, AddWorkout, BulkEdit, RestartConfirm } from '../sheets/MiscSheets';
 
 import { Splash, Welcome, Tutorial, FirstLaunch, Onboarding } from '../overlays/Flows';
 import WorkoutMode from '../overlays/WorkoutMode';
@@ -60,8 +60,6 @@ export default function Shell({ v }) {
           {v.onArchive && <ArchiveScreen v={v} />}
           {v.onArchiveDetail && <ArchiveDetailScreen v={v} />}
         </div>
-
-        {v.undoVisible && <UndoButton v={v} />}
 
         {/* ===== overlays & sheets ===== */}
         {v.exSheetOpen && <ExerciseSheet v={v} />}

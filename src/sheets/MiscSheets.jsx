@@ -36,27 +36,6 @@ export function Toast({ v }) {
   );
 }
 
-// App-wide undo. Floats bottom-left inside the phone frame, above the screens but
-// under every sheet/overlay (the lowest backdrop is z-index 40), so a sheet's backdrop hides it
-// rather than letting it be tapped through a dimmed layer. It only exists while there
-// is something on the stack, so the corner is empty the rest of the time.
-export function UndoButton({ v }) {
-  return (
-    <button
-      onClick={v.doUndo}
-      aria-label={v.undoLabel}
-      title={v.undoLabel}
-      style={s('position:absolute; z-index:38; left:14px; bottom:calc(env(safe-area-inset-bottom) + 18px); height:42px; padding:0 15px 0 12px; display:inline-flex; align-items:center; gap:7px; border:1px solid var(--border); border-radius:999px; background:var(--surface); color:var(--text); cursor:pointer; font-family:inherit; font-size:12.5px; font-weight:800; box-shadow:0 8px 24px rgba(0,0,0,.18); animation:toastIn .22s ease both;')}
-    >
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 8h10a5 5 0 0 1 0 10H8"></path><path d="M8 4 4 8l4 4"></path></svg>
-      Undo
-      {v.undoCount > 1 && (
-        <span style={s("font-family:'JetBrains Mono',monospace; font-size:10.5px; font-weight:700; color:var(--muted); background:var(--surface-2); border-radius:999px; padding:2px 6px;")}>{v.undoCount}</span>
-      )}
-    </button>
-  );
-}
-
 // #54 — Restart from the session screen (the set logger has its own, inline).
 export function RestartConfirm({ v }) {
   const rsc = v.rsc;
