@@ -38,28 +38,37 @@ const dayTypeName = (type, dayKey, customLabels, withDay, label) => {
 };
 // Onboarding tour. Every `target` names a [data-tut] element that is always on the
 // home screen while the tour runs (greet, weather, theme, week, today, weight, supps,
-// nutri, menu); steps about screens the tour can't open have no target and show
-// centred instead of pointing at something that isn't there.
+// nutri, menu). The tour never leaves the home screen, so a step about another screen
+// points at the control that leads there: the Menu for Current Program, the databases,
+// Archive and Rest mode; the today card for the workout and day actions; the macros
+// card for Meals; the theme toggle for Undo, which sits beside it once there's
+// something to undo.
+// Bump TUT_VERSION whenever the steps change enough that people who finished the old
+// tour should see the new one once. `tutorialDone` stores the version seen (legacy
+// saves stored `true`, which counts as version 1).
+const TUT_VERSION = 2;
+const tutSeen = (done) => (done === true ? 1 : (done | 0)) >= TUT_VERSION;
 const TUT_STEPS = [
-  { title: 'Welcome to Cadence', text: "Cadence tracks your lifts, cardio, meals, body weight and recovery in one place. This tour takes about two minutes and covers everything on the home screen and inside a workout." },
-  { title: 'Your profile', text: "Your greeting changes with the time of day. Long-press it to see your profile: edit your details and targets, view what Cadence has learned about your recovery, or back up and restore your data.", target: 'greet' },
-  { title: 'Weather', text: "Today's weather for your area, to help plan outdoor runs and rides. Tap it to refresh. If location is off, you can type a city instead.", target: 'weather' },
-  { title: 'Light and dark, automatically', text: "Cadence switches to dark mode at 19:00 and back to light at 07:00. Tap this button, or Appearance in the Menu, to pick the other look. Your choice holds until the next switch, then the automatic schedule takes over again.", target: 'theme' },
+  { title: 'Welcome to Cadence', text: "Cadence tracks your lifts, cardio, meals, body weight and recovery in one place. Long-press your greeting to edit your profile and targets, see your recovery profile, or export and import your data.", target: 'greet' },
+  { title: 'Weather', text: "Today's weather for your area, to help plan outdoor runs and rides. Tap it to refresh. If location is off, type a city instead.", target: 'weather' },
+  { title: 'Light and dark, automatically', text: "Cadence is dark from 19:00 to 07:00 and light the rest of the day. Tap here, or Appearance in the Menu, to switch now. Your choice holds until the next switch, then the schedule takes over again.", target: 'theme' },
+  { title: 'Undo', text: "After you change something, an Undo button appears just left of this toggle. Tap it to step back one change at a time: a logged set, a move, a skip, a deleted meal and more.", target: 'theme' },
   { title: 'Your week', text: "Each circle is a day: coloured for training, grey for rest. Tap a day to open it. Swipe left or right to look up to three weeks ahead or back.", target: 'week' },
-  { title: "Today's workout", text: "Open session takes you into today's workout. Move lift shifts it to another day in this week or a later one. Tap the workout name to change the day's type, add activities, or skip it this week.", target: 'today' },
-  { title: 'Logging sets', text: "Start workout steps through one set at a time. Each set starts from what you lifted last time. Use Fix last set to correct a set, the eye icon to see the whole session, and Restart to begin again. When you finish, rate your effort from 1 to 10." },
-  { title: 'Rest timer', text: "The rest timer starts after each set. Tap the ring to pause it, or use −30s, +30s and Skip rest. When it hits zero you'll hear a sound, and phones that support it vibrate. Set the rest length, sound and screen dimming under Menu → Workout Settings." },
-  { title: 'Supersets and dropsets', text: "Edit an exercise to pair it with another exercise from your day or anywhere in the Exercise Database. You go straight from one exercise to its partner, and the rest timer starts once you've done both. Turn on Dropset and Cadence asks for a lighter set after each working set." },
-  { title: 'Rep ranges', text: "Turn on Range next to Reps to plan something like 3 × 6–12. During the workout you'll see “Target 6–12” and log the reps you actually did. History, volume and progression always use the number you logged." },
-  { title: 'Bodyweight and timed holds', text: "Pull-ups, dips, push-ups and similar exercises count your body weight in volume, shown as “BW 82 kg”. Any weight you add, such as for a weighted pull-up, goes on top. Planks, dead hangs and wall sits are logged by time instead of reps." },
-  { title: 'Cardio', text: "Cardio is logged as distance, time and effort, from 1 to 10. Add running, cycling, rowing, machines or sports from a day's Edit menu or from Menu → Cardio Database. You can also add a second workout to a day, like an evening run after a morning lift." },
-  { title: 'Body weight', text: "Log your weight here each morning. Each weigh-in updates the weight in your profile and the weight used for bodyweight exercises. Every 14 days, Cadence compares your weight trend with what you've eaten and adjusts your calorie target.", target: 'weight' },
-  { title: 'Supplements', text: "Tick off your daily supplements here. The list resets at 3am, so a late-night dose still counts for the day you took it. Tap Edit to change the list.", target: 'supps' },
-  { title: 'Meals and macros', text: "The coloured rings fill as you log meals: protein, carbs and fat against your targets. Tap the card to open Meals, where you can search foods by name, describe a meal in text, snap a photo, or scan a barcode.", target: 'nutri' },
-  { title: 'Undo anything', text: "After you change something, an Undo button appears in the bottom-left corner. It reverses a logged set, a move, a skip, a deleted meal and more, one step at a time." },
-  { title: 'Program and Archive', text: "In the Menu, Current Program holds your weekly template: rename it, edit each day, view its history, or send it to the Archive. The Archive keeps past programs with the days you completed, and each one exports to PDF.", target: 'menu' },
-  { title: 'Rest mode', text: "Need time off? Turn on Rest mode in the Menu to hide scheduled workouts until you turn it off. Nothing is deleted.", target: 'menu' },
-  { title: 'Privacy and backup', text: "Your health data is stored locally on your device. Nothing leaves the app. Back it up from your profile (long-press the greeting) and restore it on a new device. You can replay this tour anytime from Menu → Replay Tutorial.", target: 'menu', final: true },
+  { title: "Today's workout", text: "Open session shows today's exercises. Tap Edit to change the day's type, add an activity, or skip it this week.", target: 'today' },
+  { title: 'Body weight', text: "Log your weight here. Each weigh-in updates your profile and the weight used for bodyweight exercises. Every 14 days, Cadence compares your weight trend with what you've eaten and adjusts your calorie target.", target: 'weight' },
+  { title: 'Supplements', text: "Tick off your daily supplements here. The list resets at 03:00, so a late-night dose still counts for the day you took it. Tap Edit to change the list.", target: 'supps' },
+  { title: 'Current Program', text: "Menu → Current Program is your master weekly plan. Each day is Push, Pull, Legs, Cardio, Rest or Custom. Changes here apply to every week; edits made from a day on the home screen apply to that week only. Rename the program, view its session history, or export it to PDF.", target: 'menu' },
+  { title: 'Exercises, supersets and dropsets', text: "Pick exercises from Menu → Exercise Database or add your own. Edit an exercise to set a rep range, pair it with a superset partner, or turn on Dropset. Long-press an exercise to drag it into a new order.", target: 'menu' },
+  { title: 'Logging sets', text: "Start workout steps through one set at a time, starting from what you lifted last time. A rep range shows as “Target 6–12”, bodyweight moves count as “BW 82 kg”, and planks and holds are logged by time.", target: 'today' },
+  { title: 'Inside a workout', text: "Fix last set corrects a mistake, the overview button at the top right shows the whole session, and Restart begins again. When you finish, rate your effort from 1 to 10.", target: 'today' },
+  { title: 'Rest timer and supersets', text: "The rest timer starts after each set: tap the ring to pause, or use −30s, +30s and Skip rest. At zero you'll hear a bell, and phones that support it vibrate. In a superset you log one exercise, then its partner, then rest.", target: 'today' },
+  { title: 'Moving and skipping', text: "Move lift shifts a workout to another day, for that week only. If the day is taken, choose Skip, Combine, or move the other workout elsewhere. Skip this workout (under Edit) marks it not done and keeps the exercises.", target: 'today' },
+  { title: 'Finished days', text: "Open a completed day and tap the eye button to see what you did, or Edit workout to fix it. Add another workout gives the day a second session, like an evening run after a morning lift.", target: 'today' },
+  { title: 'Cardio and sports', text: "Cardio is logged as distance, time and effort from 1 to 10. Add running, cycling, rowing, machines or sports like tennis and padel from a day's Edit menu or Menu → Cardio Database.", target: 'menu' },
+  { title: 'Meals and macros', text: "As you log meals, this card shows protein, carbs and fat against your targets. Tap the card to open Meals, where you can search foods, describe a meal in text, snap a photo, or scan a barcode.", target: 'nutri' },
+  { title: 'Archive', text: "Send a finished program to Menu → Archive. It keeps the days you completed and your workout history, and each program exports to PDF.", target: 'menu' },
+  { title: 'Rest mode and settings', text: "Need time off? Rest mode in the Menu hides scheduled workouts until you turn it off; nothing is deleted. Workout Settings sets the rest length, bell and screen dimming.", target: 'menu' },
+  { title: 'Privacy', text: "Your health data is stored locally on your device. Nothing leaves the app. Food searches and weather look-ups use public services. Replay this tour anytime from Menu → Replay Tutorial.", target: 'menu', final: true },
 ];
 const ONB_DEFAULTS = { name: '', sex: 'Male', age: '', height: '', weight: '', goal: 'Maintain', pace: 'Moderate', activity: 'Moderately Active' };
 
@@ -594,7 +603,7 @@ const timeLabel = (ts) => new Date(ts).toLocaleTimeString('en-US', { hour: 'nume
 
 export {
   DAYS, FULL, TYPES, TYPE_COLOR, TYPE_TINT, DUMBBELL, SNEAKER, HEART, MOON, TYPE_ICON,
-  typeLabel, dayTypeName, TUT_STEPS, ONB_DEFAULTS, DEFAULT_EX, CARDIO_TYPES, seedCardioDb,
+  typeLabel, dayTypeName, TUT_STEPS, TUT_VERSION, tutSeen, ONB_DEFAULTS, DEFAULT_EX, CARDIO_TYPES, seedCardioDb,
   PACES,
   migrateCardioDb, fmt, fmtDate, fmtDateShort, migrateArchive, exVol, W_DEFAULTS, scheme,
   weekStartISO, daySpan, KCAL_PER_KG, localISO, fixUtcDates, topWeight, loggedLine, exerciseNotes,

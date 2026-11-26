@@ -7,7 +7,7 @@
 import React from 'react';
 import {
   DAYS, FULL, TYPES, TYPE_COLOR, TYPE_TINT, DUMBBELL, SNEAKER, HEART, MOON, TYPE_ICON,
-  typeLabel, dayTypeName, TUT_STEPS, ONB_DEFAULTS, DEFAULT_EX, CARDIO_TYPES, seedCardioDb,
+  typeLabel, dayTypeName, TUT_STEPS, TUT_VERSION, tutSeen, ONB_DEFAULTS, DEFAULT_EX, CARDIO_TYPES, seedCardioDb,
   PACES,
   migrateCardioDb, fmt, fmtDate, fmtDateShort, migrateArchive, exVol, W_DEFAULTS, scheme,
   weekStartISO, daySpan, KCAL_PER_KG, localISO, fixUtcDates, topWeight, loggedLine, exerciseNotes,
@@ -273,7 +273,7 @@ export default class App extends React.Component {
     this._themeTimer = setInterval(() => this.applyAutoTheme(), 60 * 1000);
     this._autoTimer = setInterval(() => { this.applyAutoTheme(); this.refreshToday(); this.checkSupplementsReset(); this.normalizeCompletions(); this.maybeRefreshWeather(); }, 5 * 60 * 1000);
     this._armMidnight();
-    try { const raw = localStorage.getItem(KEY); if (raw) { const d = repairSupersets(fixUtcDates(JSON.parse(raw))); const wk = this.reconcileWeekOverrides(d); this.setState({ recurring: d.recurring || this.state.recurring, week: wk.week || d.week || this.state.week, sessions: wk.sessions || d.sessions || this.state.sessions, weekOverrides: wk.weekOverrides, weekOf: wk.weekOf, program: d.program || this.state.program, sessionHistory: d.sessionHistory || this.state.sessionHistory, programStartDate: d.programStartDate || this.state.programStartDate, programName: d.programName || this.state.programName, weights: Array.isArray(d.weights) ? d.weights : [], archive: migrateArchive(d.archive || this.state.archive), supplements: d.supplements || this.state.supplements, supplementsChecked: d.supplementsChecked || this.state.supplementsChecked, supplementsDate: d.supplementsDate || this.state.supplementsDate, exerciseDb: migrateExerciseDb(d.exerciseDb), profile: d.profile || null, meals: d.meals || [], customMeals: d.customMeals || [], tutorialDone: !!d.tutorialDone, recoveryProfile: d.recoveryProfile || { ...DEFAULT_RECOVERY }, recoveryLog: d.recoveryLog || [], cardioDb: migrateCardioDb(d.cardioDb), customLabels: d.customLabels || {}, restMode: !!d.restMode, flowPhase: (d.profile ? (d.tutorialDone ? 'done' : 'tutorial') : 'onboarding'), tutStep: (d.profile && !d.tutorialDone) ? Math.min(TUT_STEPS.length - 1, Math.max(0, parseInt(localStorage.getItem('lt_tut_step') || '0', 10) || 0)) : 0 }, () => { this.checkSupplementsReset(); this.normalizeCompletions(); this.maybeRecalibrate(); this._tutMeasureSoon(1100); }); } else { this.setState({ flowPhase: 'splash' }); this.checkSupplementsReset(); } } catch (e) {}
+    try { const raw = localStorage.getItem(KEY); if (raw) { const d = repairSupersets(fixUtcDates(JSON.parse(raw))); const wk = this.reconcileWeekOverrides(d); this.setState({ recurring: d.recurring || this.state.recurring, week: wk.week || d.week || this.state.week, sessions: wk.sessions || d.sessions || this.state.sessions, weekOverrides: wk.weekOverrides, weekOf: wk.weekOf, program: d.program || this.state.program, sessionHistory: d.sessionHistory || this.state.sessionHistory, programStartDate: d.programStartDate || this.state.programStartDate, programName: d.programName || this.state.programName, weights: Array.isArray(d.weights) ? d.weights : [], archive: migrateArchive(d.archive || this.state.archive), supplements: d.supplements || this.state.supplements, supplementsChecked: d.supplementsChecked || this.state.supplementsChecked, supplementsDate: d.supplementsDate || this.state.supplementsDate, exerciseDb: migrateExerciseDb(d.exerciseDb), profile: d.profile || null, meals: d.meals || [], customMeals: d.customMeals || [], tutorialDone: d.tutorialDone || false, recoveryProfile: d.recoveryProfile || { ...DEFAULT_RECOVERY }, recoveryLog: d.recoveryLog || [], cardioDb: migrateCardioDb(d.cardioDb), customLabels: d.customLabels || {}, restMode: !!d.restMode, flowPhase: (d.profile ? (tutSeen(d.tutorialDone) ? 'done' : 'tutorial') : 'onboarding'), tutStep: (d.profile && !tutSeen(d.tutorialDone)) ? Math.min(TUT_STEPS.length - 1, Math.max(0, parseInt(localStorage.getItem('lt_tut_step') || '0', 10) || 0)) : 0 }, () => { this.checkSupplementsReset(); this.normalizeCompletions(); this.maybeRecalibrate(); this._tutMeasureSoon(1100); }); } else { this.setState({ flowPhase: 'splash' }); this.checkSupplementsReset(); } } catch (e) {}
     this._loadTimer = setTimeout(() => this.setState({ loading: false }), 800);
     this.initWeather();
     this._ptrDetach = window.LT && window.LT.attach({ onRefresh: () => new Promise((r) => setTimeout(r, 600)) });
@@ -494,9 +494,9 @@ export default class App extends React.Component {
           programName: d.programName || this.state.programName, weights: Array.isArray(d.weights) ? d.weights : [],
           archive: migrateArchive(d.archive || this.state.archive), supplements: d.supplements || this.state.supplements,
           supplementsChecked: d.supplementsChecked || {}, supplementsDate: d.supplementsDate || this.state.supplementsDate,
-          exerciseDb: migrateExerciseDb(d.exerciseDb), profile: d.profile || null, meals: d.meals || [], customMeals: d.customMeals || [], tutorialDone: !!d.tutorialDone,
+          exerciseDb: migrateExerciseDb(d.exerciseDb), profile: d.profile || null, meals: d.meals || [], customMeals: d.customMeals || [], tutorialDone: d.tutorialDone || false,
           recoveryProfile: d.recoveryProfile || { ...DEFAULT_RECOVERY }, recoveryLog: d.recoveryLog || [], cardioDb: migrateCardioDb(d.cardioDb), customLabels: d.customLabels || {}, restMode: !!d.restMode,
-          flowPhase: (d.profile ? (d.tutorialDone ? 'done' : 'tutorial') : 'onboarding'), tutStep: (d.profile && !d.tutorialDone) ? Math.min(TUT_STEPS.length - 1, Math.max(0, parseInt(localStorage.getItem('lt_tut_step') || '0', 10) || 0)) : 0, importing: false, confirmImport: false, profileMenu: false, screen: 'week', activeDay: null, loading: false,
+          flowPhase: (d.profile ? (tutSeen(d.tutorialDone) ? 'done' : 'tutorial') : 'onboarding'), tutStep: (d.profile && !tutSeen(d.tutorialDone)) ? Math.min(TUT_STEPS.length - 1, Math.max(0, parseInt(localStorage.getItem('lt_tut_step') || '0', 10) || 0)) : 0, importing: false, confirmImport: false, profileMenu: false, screen: 'week', activeDay: null, loading: false,
         }, () => { this.checkSupplementsReset(); this.normalizeCompletions(); this.maybeRecalibrate(); this._tutMeasureSoon(1100); });
       } else { this.setState({ importing: false }); }
     } catch (e) { this.setState({ importing: false }); }
@@ -1725,7 +1725,7 @@ export default class App extends React.Component {
   completeTutorial(skipped) {
     this.haptic(true);
     this.setState({ flowPhase: 'done', tutRect: null, tutStep: 0 });
-    this.save({ tutorialDone: true }, null);
+    this.save({ tutorialDone: TUT_VERSION }, null);
     try { localStorage.setItem('cadenceTutorialComplete', 'true'); localStorage.setItem('lt_tut_step', '0'); } catch (e) {}
     if (skipped) this.showToast('You can replay the tutorial from Menu → Replay Tutorial.');
   }
