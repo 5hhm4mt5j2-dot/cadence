@@ -1,5 +1,6 @@
 import { s } from '../lib/helpers';
 import CardioFields from '../components/CardioFields';
+import ExerciseNameField from '../components/ExerciseNameField';
 
 export function ExerciseSheet({ v }) {
   const ef = v.ef;
@@ -11,7 +12,9 @@ export function ExerciseSheet({ v }) {
         <div style={s('font-size:17px; font-weight:800; color:var(--text); letter-spacing:-.02em;')}>{ef.heading}</div>
         <div style={s('margin-top:16px;')}>
           <div style={s('font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin-bottom:6px;')}>{ef.nameLabel}</div>
-          <input value={ef.name} onChange={ef.onName} placeholder="e.g. Bench Press" style={s('width:100%; border:1px solid var(--border); border-radius:11px; padding:11px 13px; background:var(--surface-2); font-family:inherit; font-size:16px; font-weight:700; color:var(--text); outline:none;')} />
+          {ef.nameField ? <ExerciseNameField f={ef.nameField} /> : (
+            <input value={ef.name} onChange={ef.onName} placeholder="e.g. Bench Press" style={s('width:100%; border:1px solid var(--border); border-radius:11px; padding:11px 13px; background:var(--surface-2); font-family:inherit; font-size:16px; font-weight:700; color:var(--text); outline:none;')} />
+          )}
         </div>
         {ef.isStrength && (
           <>
@@ -71,42 +74,19 @@ export function ExerciseSheet({ v }) {
               </span>
             </button>
             {ef.supersetOn && (
-              <div style={s('display:flex; flex-wrap:wrap; gap:7px; margin-top:9px;')}>
-                {ef.supersetChoices.map((c, i) => (
-                  <button key={i} onClick={c.pick} style={s(`border:none; cursor:pointer; font-family:inherit; font-size:12px; font-weight:700; padding:9px 13px; border-radius:999px; background:${c.bg}; color:${c.color};`)}>{c.label}</button>
-                ))}
-                {!ef.pickingPartner && (
-                  <button onClick={ef.openPartnerDb} style={s('border:1px dashed var(--border); cursor:pointer; font-family:inherit; font-size:12px; font-weight:700; padding:8px 13px; border-radius:999px; background:transparent; color:var(--accent);')}>+ From database</button>
+              <div style={s('margin-top:9px;')}>
+                {ef.supersetChoices.length > 0 && (
+                  <div style={s('display:flex; flex-wrap:wrap; gap:7px; margin-bottom:9px;')}>
+                    {ef.supersetChoices.map((c, i) => (
+                      <button key={i} onClick={c.pick} style={s(`border:none; cursor:pointer; font-family:inherit; font-size:12px; font-weight:700; padding:9px 13px; border-radius:999px; background:${c.bg}; color:${c.color};`)}>{c.label}</button>
+                    ))}
+                  </div>
                 )}
+                <ExerciseNameField f={ef.partnerField} />
               </div>
             )}
             {!!ef.partnerAddNote && (
               <div style={s('font-size:11.5px; font-weight:600; color:var(--muted); margin-top:7px;')}>{ef.partnerAddNote}</div>
-            )}
-            {ef.pickingPartner && (
-              <div style={s('margin-top:9px; border:1px solid var(--border); border-radius:14px; padding:12px; background:var(--surface);')}>
-                <div style={s('display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;')}>
-                  <span style={s('font-size:12px; font-weight:800; color:var(--text);')}>Pick a superset partner</span>
-                  <button onClick={ef.closePartnerDb} style={s('border:none; background:transparent; cursor:pointer; font-family:inherit; font-size:12px; font-weight:700; color:var(--muted); padding:0;')}>Close</button>
-                </div>
-                <input value={ef.partnerQuery} onChange={ef.onPartnerQuery} placeholder="Search the Exercise Database" aria-label="Search exercises" style={s('width:100%; border:1px solid var(--border); border-radius:10px; padding:9px 11px; background:var(--surface-2); font-family:inherit; font-size:16px; font-weight:600; color:var(--text); outline:none;')} />
-                <div style={s('display:flex; gap:6px; overflow-x:auto; margin-top:8px; padding-bottom:2px;')}>
-                  {ef.partnerParts.map((b, i) => (
-                    <button key={i} onClick={b.pick} style={s(`flex:none; border:none; cursor:pointer; font-family:inherit; font-size:11px; font-weight:700; padding:6px 10px; border-radius:999px; background:${b.bg}; color:${b.color};`)}>{b.label}</button>
-                  ))}
-                </div>
-                <div className="scrollable" style={s('max-height:200px; overflow-y:auto; margin-top:6px;')}>
-                  {ef.partnerList.map((x, i) => (
-                    <button key={i} onClick={x.pick} style={s(`width:100%; display:flex; align-items:center; justify-content:space-between; gap:8px; text-align:left; border:none; border-bottom:1px solid ${x.divider}; background:transparent; cursor:pointer; font-family:inherit; padding:9px 2px;`)}>
-                      <span style={s('font-size:13px; font-weight:700; color:var(--text); min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;')}>{x.name}</span>
-                      <span style={s('flex:none; font-size:10.5px; font-weight:600; color:var(--muted);')}>{x.onDay ? 'On this day' : x.part}</span>
-                    </button>
-                  ))}
-                  {ef.partnerEmpty && (
-                    <div style={s('font-size:12px; color:var(--muted); font-weight:500; padding:10px 2px;')}>No exercises match.</div>
-                  )}
-                </div>
-              </div>
             )}
             <button onClick={ef.toggleTimed} style={s('width:100%; margin-top:9px; display:flex; align-items:center; gap:11px; text-align:left; border:1px solid var(--border); background:var(--surface-2); cursor:pointer; font-family:inherit; padding:12px 13px; border-radius:12px;')}>
               <span style={s(`width:20px; height:20px; flex:none; border-radius:6px; border:2px solid ${ef.timedOn ? 'var(--accent)' : 'var(--border)'}; background:${ef.timedOn ? 'var(--accent)' : 'transparent'}; display:flex; align-items:center; justify-content:center; color:#fff; font-size:12px; font-weight:800;`)}>{ef.timedOn ? '✓' : ''}</span>

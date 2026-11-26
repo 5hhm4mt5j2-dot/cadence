@@ -1173,7 +1173,7 @@ export default class App extends React.Component {
       ...base,
       name: e.name, cardio: !!e.cardio, sets: e.sets, reps: e.reps, weight: e.weight,
       duration: e.duration, intensity: e.intensity, distance: e.distance != null ? e.distance : '', rpe: e.cardio ? cardioRpe(e) : null,
-      supersetWith: partner, origPartner: partner, dropset: e.dropset || null,
+      supersetWith: partner, origPartner: partner, ssOn: !!partner, dropset: e.dropset || null,
       repRange: hasRange(e), repsMin: hasRange(e) ? e.repsMin : (e.reps || ''), repsMax: hasRange(e) ? e.repsMax : '',
       timed: e.timed != null ? !!e.timed : null, bw: e.bw != null ? !!e.bw : null,
       holdSecs: e.holdSecs != null ? e.holdSecs : 30,
@@ -1194,7 +1194,8 @@ export default class App extends React.Component {
       return { name: f.name || 'Cardio', cardio: true, duration: +f.duration || 0, distance: +f.distance || 0, rpe, intensity: rpeIntensity(rpe) };
     }
     const timed = this._formTimed(f), bw = this._formBw(f);
-    const item = { name: f.name || 'Exercise', sets: f.sets || 0, reps: f.reps || 0, weight: f.weight || 0 };
+    // A typed name that matches the Exercise Database (any case) saves as the database spells it.
+    const item = { name: this._dbExerciseName(f.name) || f.name || 'Exercise', sets: f.sets || 0, reps: f.reps || 0, weight: f.weight || 0 };
     if (timed !== isTimed({ name: item.name })) item.timed = timed;
     if (!timed && bw !== isBodyweight({ name: item.name })) item.bw = bw;
     if (timed) item.holdSecs = Math.max(1, Math.min(3600, f.holdSecs || 30));
@@ -1203,7 +1204,8 @@ export default class App extends React.Component {
       // a number and nothing downstream needs to know about ranges.
       item.repsMin = +f.repsMin; item.repsMax = +f.repsMax; item.reps = +f.repsMin;
     }
-    if (f.supersetWith) item.supersetWith = f.supersetWith;
+    const partner = f.ssOn ? (this._dbExerciseName(f.supersetWith) || (f.supersetWith || '').trim()) : '';
+    if (partner && partner !== item.name) item.supersetWith = partner;
     if (f.dropset && !timed) item.dropset = { pct: f.dropset.pct };
     return item;
   }
@@ -1246,19 +1248,78 @@ export default class App extends React.Component {
     const c = { ...x }; delete c.supersetWith; return c;
   }
 
-  // #3 — the whole Exercise Database, filtered by body part and search text, for picking
-  // a superset partner that isn't on the day yet.
-  _dbPartnerList(f) {
-    const pk = f.pickPartner || {};
-    const q = (pk.q || '').trim().toLowerCase();
-    const parts = pk.cat ? BODY_PARTS.filter(b => b.key === pk.cat) : BODY_PARTS;
+  // #3 — the whole Exercise Database, filtered by body part and search text.
+  _dbExerciseList(q, cat, exclude) {
+    q = (q || '').trim().toLowerCase();
+    const parts = cat ? BODY_PARTS.filter(b => b.key === cat) : BODY_PARTS;
     const seen = {}; const out = [];
     parts.forEach(b => (this.state.exerciseDb[b.key] || []).forEach(x => {
-      if (!x || !x.name || seen[x.name] || x.name === f.name) return;
+      if (!x || !x.name || seen[x.name] || x.name === exclude) return;
       if (q && x.name.toLowerCase().indexOf(q) < 0) return;
       seen[x.name] = true; out.push({ name: x.name, part: b.label });
     }));
     return out.slice(0, 40);
+  }
+  // The database's own spelling of a name, matched ignoring case, or null.
+  _dbExerciseName(name) {
+    const n = (name || '').trim().toLowerCase(); if (!n) return null;
+    for (const b of BODY_PARTS) { const x = (this.state.exerciseDb[b.key] || []).find(e => e && e.name && e.name.toLowerCase() === n); if (x) return x.name; }
+    return null;
+  }
+  // A new exercise starts at 20 kg — unless the name makes it a bodyweight movement or
+  // a hold, where that 20 would read as added weight. Only until the weight is touched.
+  _namePatch(f, name) {
+    const patch = { name };
+    if (f.index === null && !f.weightTouched && !f.cardio) { const nf = { ...f, name }; patch.weight = (this._formBw(nf) || this._formTimed(nf)) ? 0 : 20; }
+    return patch;
+  }
+  // One exercise-name field for the sheet — the exercise itself ('name') or its superset
+  // partner ('partner'). Free text, matches from the Exercise Database as you type, and a
+  // "+" that opens the full database picker (search + body-part filters). Both fields
+  // share this and the ExerciseNameField component, so they behave identically. Names
+  // not in the database are kept as typed (custom exercises), as the sheet always allowed.
+  _exNameField(f, field) {
+    const isPartner = field === 'partner';
+    const value = (isPartner ? f.supersetWith : f.name) || '';
+    const exclude = isPartner ? f.name : null;
+    const pk = (f.picker && f.picker.field === field) ? f.picker : null;
+    const setEf = (patch) => { const cur = this.state.exForm; if (cur) this.setState({ exForm: { ...cur, ...patch } }); };
+    const set = (name, extra) => { const cur = this.state.exForm; if (!cur) return; setEf({ ...(isPartner ? { supersetWith: name } : this._namePatch(cur, name)), ...(extra || {}) }); };
+    const onDay = isPartner ? this._supersetChoices(f) : [];
+    const matched = this._dbExerciseName(value);
+    const q = value.trim();
+    const suggestions = (!pk && q.length >= 2 && !matched) ? this._dbExerciseList(q, null, exclude).slice(0, 4) : [];
+    const list = pk ? this._dbExerciseList(pk.q, pk.cat, exclude) : [];
+    return {
+      value,
+      placeholder: isPartner ? 'Partner exercise' : 'e.g. Bench Press',
+      inputLabel: isPartner ? 'Superset partner' : 'Exercise name',
+      plusLabel: isPartner ? 'Pick the superset partner from the Exercise Database' : 'Pick from the Exercise Database',
+      onText: (e) => set(e.target.value),
+      matched: !!matched,
+      // Typing an existing name in other casing still means that exercise.
+      matchNote: matched ? (matched === value.trim() ? 'In the Exercise Database' : 'Matches ' + matched) : '',
+      customNote: (q && !matched && !pk && !suggestions.length) ? 'Not in the Exercise Database — saved as a custom exercise.' : '',
+      suggestions: suggestions.map(x => ({ name: x.name, part: x.part, pick: () => set(x.name) })),
+      openPicker: () => setEf({ picker: { field, q: matched ? '' : q, cat: null } }),
+      pickerOpen: !!pk,
+      pickerTitle: isPartner ? 'Pick a superset partner' : 'Pick an exercise',
+      closePicker: () => setEf({ picker: null }),
+      query: pk ? (pk.q || '') : '',
+      onQuery: (e) => { const cur = this.state.exForm; if (cur && cur.picker) setEf({ picker: { ...cur.picker, q: e.target.value } }); },
+      parts: pk ? [{ key: null, label: 'All' }].concat(BODY_PARTS).map(b => ({
+        label: b.label,
+        bg: (pk.cat || null) === b.key ? 'var(--accent)' : 'var(--surface-2)',
+        color: (pk.cat || null) === b.key ? '#fff' : 'var(--text)',
+        pick: () => { const cur = this.state.exForm; if (cur && cur.picker) setEf({ picker: { ...cur.picker, cat: b.key } }); },
+      })) : [],
+      list: list.map((x, i, arr) => ({
+        name: x.name, sub: onDay.indexOf(x.name) >= 0 ? 'On this day' : x.part,
+        divider: i === arr.length - 1 ? 'transparent' : 'var(--border)',
+        pick: () => set(x.name, { picker: null }),
+      })),
+      empty: !!pk && list.length === 0,
+    };
   }
 
   // #56 — the other exercises on the same day, which a superset can be paired with.
@@ -3047,13 +3108,9 @@ export default class App extends React.Component {
     // exercise form
     const ef0 = s.exForm;
     const efPairs0 = ef0 ? this._supersetChoices(ef0) : [];
-    // A partner picked from the database isn't on the day yet; keep it in the chip row.
-    const efPairs = (ef0 && ef0.supersetWith && efPairs0.indexOf(ef0.supersetWith) < 0) ? efPairs0.concat([ef0.supersetWith]) : efPairs0;
     const setEf = (patch) => this.setState({ exForm: { ...this.state.exForm, ...patch } });
     const efTimed = ef0 ? this._formTimed(ef0) : false;
     const efBw = ef0 ? this._formBw(ef0) : false;
-    const efPick = ef0 && ef0.pickPartner;
-    const efPartners = efPick ? this._dbPartnerList(ef0) : [];
     const ef = ef0 ? {
       heading: ef0.index === null ? 'Add exercise' : (ef0.cardio ? 'Edit cardio' : 'Edit exercise'),
       isCardio: !!ef0.cardio, isStrength: !ef0.cardio,
@@ -3085,53 +3142,30 @@ export default class App extends React.Component {
       efforts: this._effortChips(ef0.rpe, (n) => setEf({ rpe: n })),
       effortLabel: 'Effort · RPE ' + (ef0.rpe || 5) + ' — ' + ((RPE_SCALE.find(r => r.n === (ef0.rpe || 5)) || {}).label || ''),
       browseDisplay: (ef0.mode === 'session' && ef0.index === null) ? 'inline-flex' : 'none',
-      // A new exercise starts at 20 kg — unless the name makes it a bodyweight movement or
-      // a hold, where that 20 would read as added weight. Only until the weight is touched.
-      onName: (e) => {
-        const f = this.state.exForm; const name = e.target.value;
-        const patch = { name };
-        if (f.index === null && !f.weightTouched && !f.cardio) { const nf = { ...f, name }; patch.weight = (this._formBw(nf) || this._formTimed(nf)) ? 0 : 20; }
-        this.setState({ exForm: { ...f, ...patch } });
-      },
+      onName: (e) => { const f = this.state.exForm; this.setState({ exForm: { ...f, ...this._namePatch(f, e.target.value) } }); },
+      nameField: ef0.cardio ? null : this._exNameField(ef0, 'name'),
       onSets: (e) => this.setState({ exForm: { ...s.exForm, sets: numOrEmpty(e.target.value) } }),
       onReps: (e) => this.setState({ exForm: { ...s.exForm, reps: numOrEmpty(e.target.value) } }),
       onWeight: (e) => this.setState({ exForm: { ...s.exForm, weight: numOrEmpty(e.target.value, true), weightTouched: true } }),
       onDuration: (e) => this.setState({ exForm: { ...s.exForm, duration: numOrEmpty(e.target.value) } }),
       // ---- #56 superset / dropset ----
-      supersetOn: !!ef0.supersetWith,
+      supersetOn: !!ef0.ssOn,
       supersetWith: ef0.supersetWith || '',
       // With nothing else on the day to pair with, turning it on opens the database
       // picker straight away rather than sending the user off to add a partner first.
       toggleSuperset: () => {
         const f = this.state.exForm; if (!f) return;
-        if (f.supersetWith || f.pickPartner) { setEf({ supersetWith: '', pickPartner: null }); return; }
+        if (f.ssOn) { setEf({ ssOn: false, supersetWith: '', picker: null }); return; }
         const opts = this._supersetChoices(f);
-        setEf(opts.length ? { supersetWith: opts[0] } : { pickPartner: { cat: null, q: '' } });
+        setEf(opts.length ? { ssOn: true, supersetWith: opts[0] } : { ssOn: true, supersetWith: '', picker: { field: 'partner', q: '', cat: null } });
       },
-      pickingPartner: !!efPick,
-      openPartnerDb: () => setEf({ pickPartner: { cat: null, q: '' } }),
-      closePartnerDb: () => setEf({ pickPartner: null }),
-      partnerQuery: efPick ? (efPick.q || '') : '',
-      onPartnerQuery: (e) => setEf({ pickPartner: { ...(this.state.exForm.pickPartner || {}), q: e.target.value } }),
-      partnerParts: efPick ? [{ key: null, label: 'All' }].concat(BODY_PARTS).map(b => ({
-        label: b.label,
-        bg: (efPick.cat || null) === b.key ? 'var(--accent)' : 'var(--surface-2)',
-        color: (efPick.cat || null) === b.key ? '#fff' : 'var(--text)',
-        pick: () => setEf({ pickPartner: { ...(this.state.exForm.pickPartner || {}), cat: b.key } }),
-      })) : [],
-      partnerList: efPartners.map((x, i, arr) => ({
-        name: x.name, part: x.part,
-        onDay: efPairs0.indexOf(x.name) >= 0,
-        divider: i === arr.length - 1 ? 'transparent' : 'var(--border)',
-        pick: () => setEf({ supersetWith: x.name, pickPartner: null }),
-      })),
-      partnerEmpty: !!efPick && efPartners.length === 0,
-      partnerAddNote: (ef0.supersetWith && efPairs0.indexOf(ef0.supersetWith) < 0) ? (ef0.supersetWith + ' will be added to this day as its superset partner.') : '',
-      supersetChoices: efPairs.map(n => ({
+      partnerField: ef0.ssOn ? this._exNameField(ef0, 'partner') : null,
+      partnerAddNote: (() => { const pn = (ef0.supersetWith || '').trim(); return (ef0.ssOn && pn && pn !== ef0.name && efPairs0.indexOf(pn) < 0) ? (pn + ' will be added to this day as its superset partner.') : ''; })(),
+      supersetChoices: efPairs0.map(n => ({
         label: n,
         bg: ef0.supersetWith === n ? 'var(--accent)' : 'var(--surface-2)',
         color: ef0.supersetWith === n ? '#fff' : 'var(--text)',
-        pick: () => this.setState({ exForm: { ...this.state.exForm, supersetWith: n } }),
+        pick: () => setEf({ supersetWith: n, picker: null }),
       })),
       dropsetOn: !!ef0.dropset,
       toggleDropset: () => {
@@ -4642,7 +4676,7 @@ export default class App extends React.Component {
           // Edits on a day's session stay in that week; the master is Current Programme.
           this.saveSessionExercises(day, slot, list, null);
         }
-        if (item.supersetWith && f.supersetWith && this._supersetChoices(f).indexOf(f.supersetWith) < 0) this.showToast(f.supersetWith + ' added as a superset with ' + item.name + '.');
+        if (item.supersetWith && this._supersetChoices(f).indexOf(item.supersetWith) < 0) this.showToast(item.supersetWith + ' added as a superset with ' + item.name + '.');
         this.setState({ exForm: null });
       },
       deleteExercise: () => {
